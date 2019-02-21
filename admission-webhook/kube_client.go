@@ -20,7 +20,7 @@ const (
 	crdAPIVersion   = "v1alpha1"
 	crdResourceName = "gmsacredentialspecs"
 
-	// crdContentsField is the single field that's expect to be defined in a GMSA CRD,
+	// crdContentsField is the single field that's expected to be defined in a GMSA CRD,
 	// and to contain the contents of the cred spec itself
 	crdContentsField = "credspec"
 
