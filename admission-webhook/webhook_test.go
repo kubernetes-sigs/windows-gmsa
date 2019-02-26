@@ -260,7 +260,7 @@ func TestMutateCreateRequest(t *testing.T) {
 			webhook := newWebhook(kubeClientFactory())
 
 			pod.Annotations[nameKey] = dummyCredSpecName
-			pod.Annotations[contentsKey] = `{"pre-set GSA": "cred contents"}`
+			pod.Annotations[contentsKey] = `{"pre-set GMSA": "cred contents"}`
 
 			response, err := webhook.mutateCreateRequest(pod)
 			assert.Nil(t, err)
