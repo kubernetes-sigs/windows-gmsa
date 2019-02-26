@@ -7,7 +7,7 @@ import (
 
 const dummyCredSpecName = "dummy-cred-spec-name"
 
-const dummyCredSpecContents = "dummy-cred-spec-contents"
+const dummyCredSpecContents = `{"We don't need no": ["education", "thought control", "dark sarcasm in the classroom"], "All in all you're just another": {"brick": "in", "the": "wall"}}`
 const dummyServiceAccoutName = "dummy-service-account-name"
 const dummyNamespace = "dummy-namespace"
 const dummyContainerName = "dummy-container-name"

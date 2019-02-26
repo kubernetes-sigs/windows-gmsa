@@ -54,11 +54,11 @@ func newKubeClient(config *rest.Config) (*kubeClient, error) {
 // isAuthorizedToReadConfigMap checks whether a given service account is authorized to `use` a given cred spec.
 // If it denies the request, it also returns a string explaining why.
 func (kc *kubeClient) isAuthorizedToUseCredSpec(serviceAccountName, namespace, credSpecName string) (bool, string) {
-	servceAccountUserInfo := serviceaccount.UserInfo(namespace, serviceAccountName, "")
+	serviceAccountUserInfo := serviceaccount.UserInfo(namespace, serviceAccountName, "")
 
 	// needed to cast `authorizationv1.ExtraValue` to `[]string`
 	var extra map[string]authorizationv1.ExtraValue
-	for k, v := range servceAccountUserInfo.GetExtra() {
+	for k, v := range serviceAccountUserInfo.GetExtra() {
 		extra[k] = v
 	}
 
@@ -75,9 +75,9 @@ func (kc *kubeClient) isAuthorizedToUseCredSpec(serviceAccountName, namespace, c
 				Resource:  crdResourceName,
 				Name:      credSpecName,
 			},
-			User:   servceAccountUserInfo.GetName(),
-			Groups: servceAccountUserInfo.GetGroups(),
-			UID:    servceAccountUserInfo.GetUID(),
+			User:   serviceAccountUserInfo.GetName(),
+			Groups: serviceAccountUserInfo.GetGroups(),
+			UID:    serviceAccountUserInfo.GetUID(),
 			Extra:  extra,
 		},
 	}
@@ -114,7 +114,7 @@ func (kc *kubeClient) retrieveCredSpecContents(credSpecName string) (string, int
 		return "", http.StatusInternalServerError, fmt.Errorf("unable to marshall cred spec %s into a JSON: %v", credSpecName, err)
 	}
 
-	return string(contentsBytes), 0, nil
+	return string(contentsBytes), http.StatusOK, nil
 }
 
 // isNotFoundError returns true if the error indicates "not found".  It parses

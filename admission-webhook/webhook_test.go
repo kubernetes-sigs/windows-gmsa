@@ -60,17 +60,44 @@ func TestValidateCreateRequest(t *testing.T) {
 			assert.True(t, response.Allowed)
 		},
 
+		"if the cred spec contents are not byte-to-byte equal to that of the one named, but still represent equivalent JSONs, it passes": func(t *testing.T, pod *corev1.Pod, nameKey, contentsKey string) {
+			webhook := newWebhook(kubeClientFactory())
+
+			pod.Annotations[nameKey] = dummyCredSpecName
+			pod.Annotations[contentsKey] = `{"All in all you're just another":      {"the":"wall","brick":   "in"},"We don't need no":["education", "thought control","dark sarcasm in the classroom"]}`
+
+			response, err := webhook.validateCreateRequest(pod, dummyNamespace)
+			assert.Nil(t, err)
+
+			require.NotNil(t, response)
+			assert.True(t, response.Allowed)
+		},
+
 		"if the cred spec contents are not that of the one named, it fails": func(t *testing.T, pod *corev1.Pod, nameKey, contentsKey string) {
 			webhook := newWebhook(kubeClientFactory())
 
 			pod.Annotations[nameKey] = dummyCredSpecName
-			pod.Annotations[contentsKey] = "wrong-contents"
+			pod.Annotations[contentsKey] = `{"We don't need no": ["money"], "All in all you're just another": {"brick": "in", "the": "wall"}}`
 
 			response, err := webhook.validateCreateRequest(pod, dummyNamespace)
 			assert.Nil(t, response)
 
 			assertPodAdmissionErrorContains(t, err, pod, http.StatusForbidden,
-				"cred spec contained in annotation %s does not match the contents of GMSA %s",
+				"cred spec contained in annotation %q does not match the contents of GMSA %q",
+				contentsKey, dummyCredSpecName)
+		},
+
+		"if the cred spec contents are not byte-to-byte equal to that of the one named, and are not even a valid JSON object, it fails": func(t *testing.T, pod *corev1.Pod, nameKey, contentsKey string) {
+			webhook := newWebhook(kubeClientFactory())
+
+			pod.Annotations[nameKey] = dummyCredSpecName
+			pod.Annotations[contentsKey] = "i ain't no JSON object"
+
+			response, err := webhook.validateCreateRequest(pod, dummyNamespace)
+			assert.Nil(t, response)
+
+			assertPodAdmissionErrorContains(t, err, pod, http.StatusForbidden,
+				"cred spec contained in annotation %q does not match the contents of GMSA %q",
 				contentsKey, dummyCredSpecName)
 		},
 
@@ -216,10 +243,9 @@ func TestMutateCreateRequest(t *testing.T) {
 			}
 		},
 
-		"if the contents annotation is already set, it fails": func(t *testing.T, pod *corev1.Pod, nameKey, contentsKey string) {
+		"if the contents annotation is already set, but the name one isn't, it fails": func(t *testing.T, pod *corev1.Pod, nameKey, contentsKey string) {
 			webhook := newWebhook(kubeClientFactory())
 
-			pod.Annotations[nameKey] = dummyCredSpecName
 			pod.Annotations[contentsKey] = dummyCredSpecContents
 
 			response, err := webhook.mutateCreateRequest(pod)
@@ -227,7 +253,34 @@ func TestMutateCreateRequest(t *testing.T) {
 			assert.Nil(t, response)
 
 			assertPodAdmissionErrorContains(t, err, pod, http.StatusForbidden,
-				"cannot pre-set a pod's gMSA content annotation (annotation %s present)", contentsKey)
+				"cannot pre-set a pod's gMSA content annotation (annotation %q present) without setting the corresponding name annotation", contentsKey)
+		},
+
+		"it the contents annotation is already set, along with the name one, it passes and doesn't overwrite the provided contents": func(t *testing.T, pod *corev1.Pod, nameKey, contentsKey string) {
+			webhook := newWebhook(kubeClientFactory())
+
+			pod.Annotations[nameKey] = dummyCredSpecName
+			pod.Annotations[contentsKey] = `{"pre-set GSA": "cred contents"}`
+
+			response, err := webhook.mutateCreateRequest(pod)
+			assert.Nil(t, err)
+
+			// all the patches we receive should be for the extra containers
+			expectedPatchesLen := len(pod.Spec.Containers) - 1
+
+			if expectedPatchesLen == 0 {
+				assert.Nil(t, response.PatchType)
+				assert.Nil(t, response.Patch)
+			} else {
+				var patches []map[string]string
+				if err := json.Unmarshal(response.Patch, &patches); assert.Nil(t, err) && assert.Equal(t, expectedPatchesLen, len(patches)) {
+					for _, patch := range patches {
+						if path, hasPath := patch["path"]; assert.True(t, hasPath) {
+							assert.NotContains(t, path, dummyCredSpecName)
+						}
+					}
+				}
+			}
 		},
 
 		"if there is an error when retrieving the cred-spec's contents, it fails": func(t *testing.T, pod *corev1.Pod, nameKey, contentsKey string) {

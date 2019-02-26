@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"reflect"
 	"strconv"
 	"strings"
 
@@ -251,14 +252,20 @@ func (webhook *webhook) validateCreateRequest(pod *corev1.Pod, namespace string)
 			if credSpecContents, present := pod.Annotations[contentsKey]; present {
 				if expectedContents, code, retrieveErr := webhook.client.retrieveCredSpecContents(credSpecName); retrieveErr != nil {
 					err = &podAdmissionError{error: retrieveErr, pod: pod, code: code}
-				} else if credSpecContents != expectedContents {
-					err = &podAdmissionError{error: fmt.Errorf("cred spec contained in annotation %s does not match the contents of GMSA %s", contentsKey, credSpecName), pod: pod, code: http.StatusForbidden}
+					return
+				} else if specsEqual, compareErr := compareCredSpecContents(credSpecContents, expectedContents); !specsEqual || compareErr != nil {
+					msg := fmt.Sprintf("cred spec contained in annotation %q does not match the contents of GMSA %q", contentsKey, credSpecName)
+					if compareErr != nil {
+						msg += fmt.Sprintf(": %v", compareErr)
+					}
+					err = &podAdmissionError{error: fmt.Errorf(msg), pod: pod, code: http.StatusForbidden}
+					return
 				}
 			}
-
 		} else if _, present := pod.Annotations[contentsKey]; present {
 			// the name annotation is not present, but the content one is
 			err = &podAdmissionError{error: fmt.Errorf("cannot pre-set a pod's gMSA content annotation (annotation %v present)", contentsKey), pod: pod, code: http.StatusForbidden}
+			return
 		}
 	})
 	if err != nil {
@@ -266,6 +273,30 @@ func (webhook *webhook) validateCreateRequest(pod *corev1.Pod, namespace string)
 	}
 
 	return &admissionv1beta1.AdmissionResponse{Allowed: true}, nil
+}
+
+// compareCredSpecContents returns true iff the two strings represent the same credential spec contents.
+func compareCredSpecContents(fromAnnotation, fromCRD string) (bool, error) {
+	// this is actually what happens almost all the time, when users don't set the contents annotation directly
+	// but instead rely on the mutating webhook to do that for them; and in that case no need for a slow
+	// JSON parsing and comparison
+	if fromAnnotation == fromCRD {
+		return true, nil
+	}
+
+	var (
+		jsonObjectFromAnnotation map[string]interface{}
+		jsonObjectFromCRD        map[string]interface{}
+	)
+
+	if err := json.Unmarshal([]byte(fromAnnotation), &jsonObjectFromAnnotation); err != nil {
+		return false, fmt.Errorf("unable to parse annotation %q as a JSON object: %v", fromAnnotation, err)
+	}
+	if err := json.Unmarshal([]byte(fromCRD), &jsonObjectFromCRD); err != nil {
+		return false, fmt.Errorf("unable to parse CRD %q as a JSON object: %v", fromCRD, err)
+	}
+
+	return reflect.DeepEqual(jsonObjectFromAnnotation, jsonObjectFromCRD), nil
 }
 
 // mutateCreateRequest inlines the requested GMSA's into the pod's spec as annotations.
@@ -280,14 +311,19 @@ func (webhook *webhook) mutateCreateRequest(pod *corev1.Pod) (*admissionv1beta1.
 			return
 		}
 
-		if _, present := pod.Annotations[contentsKey]; present {
-			// only this admission controller is allowed to populate the actual contents of the cred spec
-			// and "/mutate" is called before "/validate"
-			err = &podAdmissionError{error: fmt.Errorf("cannot pre-set a pod's gMSA content annotation (annotation %v present)", contentsKey), pod: pod, code: http.StatusForbidden}
-		} else if credSpecName, present := pod.Annotations[nameKey]; present && credSpecName != "" {
-			if contents, code, retrieveErr := webhook.client.retrieveCredSpecContents(credSpecName); retrieveErr != nil {
-				err = &podAdmissionError{error: retrieveErr, pod: pod, code: code}
-			} else {
+		credSpecName, nameAnnotationPresent := pod.Annotations[nameKey]
+		_, contentsAnnotationPresent := pod.Annotations[contentsKey]
+
+		if nameAnnotationPresent && credSpecName != "" {
+			// if the user has pre-set the contents annotation, we won't override it - it'll be down to the validation
+			// endpoint to make sure the contents actually are what they should
+			if !contentsAnnotationPresent {
+				contents, code, retrieveErr := webhook.client.retrieveCredSpecContents(credSpecName)
+				if retrieveErr != nil {
+					err = &podAdmissionError{error: retrieveErr, pod: pod, code: code}
+					return
+				}
+
 				// worth noting that this JSON patch is guaranteed to work since we know at this point
 				// that the pod has annotations, and and that it doesn't have this specific one
 				patches = append(patches, map[string]string{
@@ -296,6 +332,11 @@ func (webhook *webhook) mutateCreateRequest(pod *corev1.Pod) (*admissionv1beta1.
 					"value": contents,
 				})
 			}
+		} else if contentsAnnotationPresent {
+			// the name annotation is not present, but the content one is
+			msg := fmt.Sprintf("cannot pre-set a pod's gMSA content annotation (annotation %q present) without setting the corresponding name annotation %q", contentsKey, nameKey)
+			err = &podAdmissionError{error: fmt.Errorf(msg), pod: pod, code: http.StatusForbidden}
+			return
 		}
 	})
 	if err != nil {
@@ -335,10 +376,11 @@ func validateUpdateRequest(pod, oldPod *corev1.Pod) (*admissionv1beta1.Admission
 		if err != nil {
 			return
 		}
-		if nameKeyErr := assertAnnotationsUnchanged(pod, oldPod, nameKey); nameKeyErr != nil {
-			err = nameKeyErr
-		} else if contentsKeyErr := assertAnnotationsUnchanged(pod, oldPod, contentsKey); contentsKeyErr != nil {
-			err = contentsKeyErr
+		if err = assertAnnotationsUnchanged(pod, oldPod, nameKey); err != nil {
+			return
+		}
+		if err = assertAnnotationsUnchanged(pod, oldPod, contentsKey); err != nil {
+			return
 		}
 	})
 	if err != nil {
