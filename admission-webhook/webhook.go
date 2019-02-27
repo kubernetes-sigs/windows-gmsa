@@ -226,7 +226,7 @@ func unmarshallPod(object runtime.RawExtension) (*corev1.Pod, *podAdmissionError
 	return pod, nil
 }
 
-// validateCreateRequest ensures that the only GMSA content annotations set on the pod,
+// validateCreateRequest ensures that the GMSA contents annotations set on the pod
 // match the corresponding GMSA name annotations, and that the pod's service account
 // is authorized to `use` the requested GMSA's.
 func (webhook *webhook) validateCreateRequest(pod *corev1.Pod, namespace string) (*admissionv1beta1.AdmissionResponse, *podAdmissionError) {
@@ -248,7 +248,7 @@ func (webhook *webhook) validateCreateRequest(pod *corev1.Pod, namespace string)
 				return
 			}
 
-			// and the content annotation should contain the expected cred spec
+			// and the contents annotation should contain the expected cred spec
 			if credSpecContents, present := pod.Annotations[contentsKey]; present {
 				if expectedContents, code, retrieveErr := webhook.client.retrieveCredSpecContents(credSpecName); retrieveErr != nil {
 					err = &podAdmissionError{error: retrieveErr, pod: pod, code: code}
@@ -258,13 +258,14 @@ func (webhook *webhook) validateCreateRequest(pod *corev1.Pod, namespace string)
 					if compareErr != nil {
 						msg += fmt.Sprintf(": %v", compareErr)
 					}
-					err = &podAdmissionError{error: fmt.Errorf(msg), pod: pod, code: http.StatusForbidden}
+					err = &podAdmissionError{error: fmt.Errorf(msg), pod: pod, code: http.StatusUnprocessableEntity}
 					return
 				}
 			}
 		} else if _, present := pod.Annotations[contentsKey]; present {
-			// the name annotation is not present, but the content one is
-			err = &podAdmissionError{error: fmt.Errorf("cannot pre-set a pod's gMSA content annotation (annotation %v present)", contentsKey), pod: pod, code: http.StatusForbidden}
+			// the name annotation is not present, but the contents one is
+			msg := fmt.Sprintf("cannot pre-set a pod's gMSA contents annotation (annotation %q present) without setting the corresponding name annotation %q", contentsKey, nameKey)
+			err = &podAdmissionError{error: fmt.Errorf(msg), pod: pod, code: http.StatusUnprocessableEntity}
 			return
 		}
 	})
@@ -311,13 +312,10 @@ func (webhook *webhook) mutateCreateRequest(pod *corev1.Pod) (*admissionv1beta1.
 			return
 		}
 
-		credSpecName, nameAnnotationPresent := pod.Annotations[nameKey]
-		_, contentsAnnotationPresent := pod.Annotations[contentsKey]
-
-		if nameAnnotationPresent && credSpecName != "" {
-			// if the user has pre-set the contents annotation, we won't override it - it'll be down to the validation
-			// endpoint to make sure the contents actually are what they should
-			if !contentsAnnotationPresent {
+		if credSpecName, present := pod.Annotations[nameKey]; present && credSpecName != "" {
+			// if the user has pre-set the contents annotation, we won't override it - it'll be down
+			// to the validation endpoint to make sure the contents actually are what they should
+			if _, present = pod.Annotations[contentsKey]; !present {
 				contents, code, retrieveErr := webhook.client.retrieveCredSpecContents(credSpecName)
 				if retrieveErr != nil {
 					err = &podAdmissionError{error: retrieveErr, pod: pod, code: code}
@@ -332,11 +330,6 @@ func (webhook *webhook) mutateCreateRequest(pod *corev1.Pod) (*admissionv1beta1.
 					"value": contents,
 				})
 			}
-		} else if contentsAnnotationPresent {
-			// the name annotation is not present, but the content one is
-			msg := fmt.Sprintf("cannot pre-set a pod's gMSA content annotation (annotation %q present) without setting the corresponding name annotation %q", contentsKey, nameKey)
-			err = &podAdmissionError{error: fmt.Errorf(msg), pod: pod, code: http.StatusForbidden}
-			return
 		}
 	})
 	if err != nil {

@@ -82,7 +82,7 @@ func TestValidateCreateRequest(t *testing.T) {
 			response, err := webhook.validateCreateRequest(pod, dummyNamespace)
 			assert.Nil(t, response)
 
-			assertPodAdmissionErrorContains(t, err, pod, http.StatusForbidden,
+			assertPodAdmissionErrorContains(t, err, pod, http.StatusUnprocessableEntity,
 				"cred spec contained in annotation %q does not match the contents of GMSA %q",
 				contentsKey, dummyCredSpecName)
 		},
@@ -96,7 +96,7 @@ func TestValidateCreateRequest(t *testing.T) {
 			response, err := webhook.validateCreateRequest(pod, dummyNamespace)
 			assert.Nil(t, response)
 
-			assertPodAdmissionErrorContains(t, err, pod, http.StatusForbidden,
+			assertPodAdmissionErrorContains(t, err, pod, http.StatusUnprocessableEntity,
 				"cred spec contained in annotation %q does not match the contents of GMSA %q",
 				contentsKey, dummyCredSpecName)
 		},
@@ -109,8 +109,8 @@ func TestValidateCreateRequest(t *testing.T) {
 
 			assert.Nil(t, response)
 
-			assertPodAdmissionErrorContains(t, err, pod, http.StatusForbidden,
-				"cannot pre-set a pod's gMSA content annotation (annotation %s present)", contentsKey)
+			assertPodAdmissionErrorContains(t, err, pod, http.StatusUnprocessableEntity,
+				"cannot pre-set a pod's gMSA contents annotation (annotation %q present) without setting the corresponding name annotation", contentsKey)
 		},
 
 		"if the service account is not authorized to use the cred-spec, it fails": func(t *testing.T, pod *corev1.Pod, nameKey, contentsKey string) {
@@ -241,19 +241,6 @@ func TestMutateCreateRequest(t *testing.T) {
 					}
 				}
 			}
-		},
-
-		"if the contents annotation is already set, but the name one isn't, it fails": func(t *testing.T, pod *corev1.Pod, nameKey, contentsKey string) {
-			webhook := newWebhook(kubeClientFactory())
-
-			pod.Annotations[contentsKey] = dummyCredSpecContents
-
-			response, err := webhook.mutateCreateRequest(pod)
-
-			assert.Nil(t, response)
-
-			assertPodAdmissionErrorContains(t, err, pod, http.StatusForbidden,
-				"cannot pre-set a pod's gMSA content annotation (annotation %q present) without setting the corresponding name annotation", contentsKey)
 		},
 
 		"it the contents annotation is already set, along with the name one, it passes and doesn't overwrite the provided contents": func(t *testing.T, pod *corev1.Pod, nameKey, contentsKey string) {
