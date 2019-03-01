@@ -1,4 +1,6 @@
-# Kubernetes Template Project
+[![Build Status](https://travis-ci.org/kubernetes-sigs/windows-gmsa.svg?branch=master)](https://travis-ci.org/kubernetes-sigs/windows-gmsa)
+
+# Kubernetes Windows GMSA
 
 External components to support [Windows' GMSA](https://docs.microsoft.com/en-us/windows-server/security/group-managed-service-accounts/group-managed-service-accounts-overview) in Kubernetes.
 

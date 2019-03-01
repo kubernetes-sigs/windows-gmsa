@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
@@ -60,7 +62,8 @@ func newWebhook(client kubeClientInterface) *webhook {
 }
 
 // start is a blocking call.
-func (webhook *webhook) start(port int, tlsConfig *tlsConfig) error {
+// If passed a listeningChan, it will close it when it's started listening
+func (webhook *webhook) start(port int, tlsConfig *tlsConfig, listeningChan chan interface{}) error {
 	if webhook.server != nil {
 		return fmt.Errorf("webhook already started")
 	}
@@ -71,11 +74,21 @@ func (webhook *webhook) start(port int, tlsConfig *tlsConfig) error {
 	}
 
 	logrus.Infof("starting webhook server at port %v", port)
-	var err error
+	listener, err := net.Listen("tcp", webhook.server.Addr)
+	if err != nil {
+		return err
+	}
+	defer listener.Close()
+	keepAliveListener := tcpKeepAliveListener{listener.(*net.TCPListener)}
+
+	if listeningChan != nil {
+		close(listeningChan)
+	}
+
 	if tlsConfig == nil {
-		err = webhook.server.ListenAndServe()
+		err = webhook.server.Serve(keepAliveListener)
 	} else {
-		err = webhook.server.ListenAndServeTLS(tlsConfig.crtPath, tlsConfig.keyPath)
+		err = webhook.server.ServeTLS(keepAliveListener, tlsConfig.crtPath, tlsConfig.keyPath)
 	}
 
 	if err != nil {
@@ -434,4 +447,19 @@ func deniedAdmissionResponse(err error, httpCode ...int) *admissionv1beta1.Admis
 			Code:    int32(code),
 		},
 	}
+}
+
+// stolen from https://github.com/golang/go/blob/go1.12/src/net/http/server.go#L3255-L3271
+type tcpKeepAliveListener struct {
+	*net.TCPListener
+}
+
+func (ln tcpKeepAliveListener) Accept() (net.Conn, error) {
+	tc, err := ln.AcceptTCP()
+	if err != nil {
+		return nil, err
+	}
+	tc.SetKeepAlive(true)
+	tc.SetKeepAlivePeriod(3 * time.Minute)
+	return tc, nil
 }
