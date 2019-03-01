@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -172,9 +173,16 @@ func startHTTPServer(t *testing.T, kubeClient *dummyKubeClient) (int, func()) {
 	webhook := newWebhook(kubeClient)
 	port := getAvailablePort(t)
 
+	listeningChan := make(chan interface{})
 	go func() {
-		assert.Nil(t, webhook.start(port, nil))
+		assert.Nil(t, webhook.start(port, nil, listeningChan))
 	}()
+
+	select {
+	case <-listeningChan:
+	case <-time.After(5 * time.Second):
+		t.Fatalf("Timed out waiting for HTTP server to start listening on %d", port)
+	}
 
 	return port, func() {
 		assert.Nil(t, webhook.stop())

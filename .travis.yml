@@ -1,0 +1,16 @@
+language: go
+
+go:
+  - 1.12
+
+install:
+  - curl https://glide.sh/get | sh
+  - cd $TRAVIS_BUILD_DIR/admission-webhook && glide install -v
+
+cache:
+  directories:
+    # contains glide's cache
+    - ~/.glide
+
+script:
+  - cd $TRAVIS_BUILD_DIR/admission-webhook && make test
