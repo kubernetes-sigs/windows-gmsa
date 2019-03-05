@@ -19,9 +19,9 @@ This script:
 
 usage: $0 --file MANIFESTS_FILE [--name NAME] [--namespace NAMESPACE] [--image IMAGE_NAME] [--certs-dir CERTS_DIR] [--dry-run] [--overwrite]
 
-MANIFESTS_FILE is the path to the file where the k8s manifests will be written
-NAME defaults to 'gsma-webhook' and is used in the names of most the k8s resources created.
-NAMESPACE is the namespace to deploy to; defaults to 'gmsa-webhook' - will error out if the namespace already exists.
+MANIFESTS_FILE is the path to the file the k8s manifests will be written to.
+NAME defaults to 'gmsa-webhook' and is used in the names of most of the k8s resources created.
+NAMESPACE is the namespace to deploy to; defaults to 'gmsa-webhook'.
 IMAGE_NAME is the name of the Docker image containing the webhook; defaults to 'wk88/k8s-gmsa-webhook:latest' (FIXME: figure out a better way to distribute this image)
 CERTS_DIR defaults to 'gmsa-webhook-certs'
 
@@ -36,13 +36,17 @@ EOF
 DEPLOY_DIR="$(dirname "$0")"
 TMP_DIR_PREFIX='/tmp/gmsa-webhook-deploy-'
 
+# it's possible to override these 2 to download from another repo/branch
+[ "$K8S_GMSA_DEPLOY_DOWNLOAD_REPO" ] || K8S_GMSA_DEPLOY_DOWNLOAD_REPO='kubernetes-sigs/windows-gmsa'
+[ "$K8S_GMSA_DEPLOY_DOWNLOAD_REV" ] || K8S_GMSA_DEPLOY_DOWNLOAD_REV='master'
+
 ensure_helper_file_present() {
     local NAME="$1"
     local DIR="$DEPLOY_DIR"
 
     if [ ! -r "$DIR/$NAME" ]; then
         DIR=$(mktemp -d "${TMP_DIR_PREFIX}XXXXXXX")
-        local URL="https://raw.githubusercontent.com/kubernetes-sigs/windows-gmsa/master/admission-webhook/deploy/$NAME"
+        local URL="https://raw.githubusercontent.com/$K8S_GMSA_DEPLOY_DOWNLOAD_REPO/$K8S_GMSA_DEPLOY_DOWNLOAD_REV/admission-webhook/deploy/$NAME"
 
         if which curl &> /dev/null; then
             curl -sL "$URL" > "$DIR/$NAME"
@@ -72,7 +76,7 @@ main() {
                 NAME="$2" && shift 2 ;;
             --namespace)
                 NAMESPACE="$2" && shift 2 ;;
-            --image-name)
+            --image)
                 IMAGE_NAME="$2" && shift 2 ;;
             --certs-dir)
                 CERTS_DIR="$2" && shift 2 ;;
@@ -81,6 +85,7 @@ main() {
             --overwrite)
                 OVERWRITE=true && shift ;;
             *)
+                echo "Unknown option: $1"
                 usage ;;
         esac
     done
@@ -134,6 +139,19 @@ main() {
         envsubst < "$TEMPLATE_PATH" > "$MANIFESTS_FILE"
 
     echo_or_run --with-kubectl-dry-run "$KUBECTL apply -f $MANIFESTS_FILE"
+
+    verify_webhook_ready() {
+        local SERVICE_IP HTTP_CODE
+
+        if SERVICE_IP="$($KUBECTL -n $NAMESPACE get service $NAME -o=jsonpath='{.spec.clusterIP}')" \
+                && HTTP_CODE="$(docker exec kube-master curl -kso /dev/null -w '%{http_code}' https://$SERVICE_IP/health)"; then
+            echo "HTTP code from hitting the health endpoint: $HTTP_CODE"
+            [[ "$HTTP_CODE" == '204' ]]
+        else
+            return 1
+        fi
+    }
+    wait_for verify_webhook_ready 'webhook not ready'
 
     if ! $DRY_RUN; then
         info 'Windows GMSA Admission Webhook successfully deployed!'

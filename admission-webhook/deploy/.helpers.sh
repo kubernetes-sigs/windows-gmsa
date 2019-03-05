@@ -31,9 +31,9 @@ fatal_error() {
 }
 
 if [ ! "$KUBECTL" ]; then
-    KUBECTL=$(which kubectl)
+    KUBECTL=$(which kubectl) || true
 fi
-if [ ! -x "$KUBECTL" ]; then
+if [ ! -x $KUBECTL ]; then
     fatal_error 'kubectl not found'
 fi
 
@@ -52,6 +52,24 @@ echo_or_run() {
     else
         eval "$@"
     fi
+}
+
+wait_for() {
+    local FUN="$1"
+    local ERROR_MSG="$2"
+    local MAX_ATTEMPTS="$3"
+    [ "$MAX_ATTEMPTS" ] || MAX_ATTEMPTS=30
+
+    local OUTPUT
+    for _ in $(seq "$MAX_ATTEMPTS"); do
+        if OUTPUT=$($FUN); then
+            echo "$OUTPUT"
+            return
+        fi
+        sleep 1
+    done
+
+    fatal_error "$ERROR_MSG, giving up after $MAX_ATTEMPTS attempts - last attempt's output: $OUTPUT"
 }
 
 SERVER_KEY="$CERTS_DIR/server-key.pem"

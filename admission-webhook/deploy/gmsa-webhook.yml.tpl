@@ -86,6 +86,11 @@ spec:
       - name: ${NAME}
         image: ${IMAGE_NAME}
         imagePullPolicy: IfNotPresent
+        readinessProbe:
+          httpGet:
+            scheme: HTTPS
+            path: /health
+            port: 443
         ports:
         - containerPort: 443
         volumeMounts:

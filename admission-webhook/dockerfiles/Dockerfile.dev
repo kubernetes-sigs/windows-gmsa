@@ -20,7 +20,8 @@ COPY /vendor ./vendor
 
 # build
 COPY *.go ./
-RUN go build
+ARG VERSION
+RUN go build -ldflags="-X main.version=${VERSION}"
 
 # copy the rest
 COPY . .

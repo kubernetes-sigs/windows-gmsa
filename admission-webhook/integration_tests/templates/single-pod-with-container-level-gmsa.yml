@@ -1,0 +1,21 @@
+## this deploys a single pod with a container-level GMSA cred spec
+
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    app: {{ .TestName }}
+  name: {{ .TestName }}
+  namespace: {{ .Namespace }}
+  annotations:
+    {{ .TestName }}.container.alpha.windows.kubernetes.io/gmsa-credential-spec-name: {{ index .CredSpecNames 0 }}
+{{- range $k, $v := .ExtraAnnotations }}
+    {{ $k }}: {{ $v }}
+{{- end }}
+spec:
+  serviceAccountName: {{ .ServiceAccountName }}
+  containers:
+  - name: {{ .TestName }}
+    image: nginx
+  dnsPolicy: ClusterFirst
+  restartPolicy: Never

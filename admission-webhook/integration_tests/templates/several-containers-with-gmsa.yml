@@ -1,0 +1,37 @@
+## a simple deployment with several containers: 2 with their own GMSA, and 1 without it, plus a pod-level annotation
+
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  labels:
+    app: {{ .TestName }}
+  name: {{ .TestName }}
+  namespace: {{ .Namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .TestName }}
+  template:
+    metadata:
+      labels:
+        app: {{ .TestName }}
+      annotations:
+        nginx0.container.alpha.windows.kubernetes.io/gmsa-credential-spec-name: {{ index .CredSpecNames 0 }}
+        pod.alpha.windows.kubernetes.io/gmsa-credential-spec-name: {{ index .CredSpecNames 1 }}
+        nginx2.container.alpha.windows.kubernetes.io/gmsa-credential-spec-name: {{ index .CredSpecNames 2 }}
+    spec:
+      serviceAccountName: {{ .ServiceAccountName }}
+      containers:
+      - image: nginx
+        name: nginx0
+        ports:
+        - containerPort: 80
+      - image: nginx
+        name: nginx1
+        ports:
+        - containerPort: 80
+      - image: nginx
+        name: nginx2
+        ports:
+        - containerPort: 80
