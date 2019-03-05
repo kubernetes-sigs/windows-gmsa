@@ -1,11 +1,13 @@
 package integrationtests
 
 import (
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"io/ioutil"
 	"os"
 	"path"
+	"reflect"
 	"strconv"
 	"testing"
 
@@ -69,14 +71,23 @@ func TestHappyPathWithSeveralContainers(t *testing.T) {
 func TestHappyPathWithPreSetMatchingAnnotations(t *testing.T) {
 	testName := "happy-path-with-pre-set-matching-annotations"
 	credSpecTemplates := []string{"credspec-0"}
-	templates := []string{"credspecs-users-rbac-role", "service-account", "sa-rbac-binding", "simple-with-gmsa"}
+	templates := []string{"credspecs-users-rbac-role", "service-account", "sa-rbac-binding", "simple-with-pre-set-matching-annotations"}
 
 	testConfig, tearDownFunc := integrationTestSetup(t, testName, credSpecTemplates, templates)
 	defer tearDownFunc()
 
 	pod := waitForPodToComeUp(t, testConfig.Namespace, "app="+testName)
 
-	assert.Equal(t, expectedCredSpec0, pod.Annotations["pod.alpha.windows.kubernetes.io/gmsa-credential-spec"])
+	assert.NotEqual(t, expectedCredSpec0, pod.Annotations["pod.alpha.windows.kubernetes.io/gmsa-credential-spec"])
+
+	var (
+		expectedCredSpec map[string]interface{}
+		actualCredSpec   map[string]interface{}
+	)
+	if assert.Nil(t, json.Unmarshal([]byte(expectedCredSpec0), &expectedCredSpec)) &&
+		assert.Nil(t, json.Unmarshal([]byte(pod.Annotations["pod.alpha.windows.kubernetes.io/gmsa-credential-spec"]), &actualCredSpec)) {
+		assert.True(t, reflect.DeepEqual(expectedCredSpec, actualCredSpec))
+	}
 }
 
 func TestServiceAccountDoesNotHavePermissionsToUseCredSpec(t *testing.T) {
@@ -152,6 +163,26 @@ func TestCannotPreSetGMSAContainerLevelContentsAnnotationsWithoutNameAnnotations
 		assert.Equal(t, condition.Reason, "FailedCreate")
 
 		assert.Contains(t, condition.Message, "cannot pre-set a pod's gMSA contents annotation (annotation \"nginx.container.alpha.windows.kubernetes.io/gmsa-credential-spec\" present) without setting the corresponding name annotation")
+	}
+}
+
+func TestCannotPreSetUnmatchingGMSAAnnotations(t *testing.T) {
+	testName := "cannot-pre-set-unmatching-gmsa-annotations"
+	credSpecTemplates := []string{"credspec-0"}
+	templates := []string{"all-credspecs-users-rbac-role", "service-account", "sa-rbac-binding", "simple-with-pre-set-unmatching-annotations"}
+
+	testConfig, tearDownFunc := integrationTestSetup(t, testName, credSpecTemplates, templates)
+	defer tearDownFunc()
+
+	replicaSet := waitForReplicaSetGen1(t, testConfig.Namespace, "app="+testName)
+	assert.Equal(t, int32(0), replicaSet.Status.Replicas)
+	if assert.Equal(t, 1, len(replicaSet.Status.Conditions)) {
+		condition := replicaSet.Status.Conditions[0]
+
+		assert.Equal(t, condition.Reason, "FailedCreate")
+
+		expectedSubstr := fmt.Sprintf("cred spec contained in annotation \"pod.alpha.windows.kubernetes.io/gmsa-credential-spec\" does not match the contents of GMSA %q", testConfig.CredSpecNames[0])
+		assert.Contains(t, condition.Message, expectedSubstr)
 	}
 }
 

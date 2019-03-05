@@ -31,7 +31,7 @@ integration_tests_with_dev_image: image_build_dev deploy_dev_webhook run_integra
 # the $INTEGRATION_TEST_FLAGS env var can be set to eg run only specific tests
 .PHONY: run_integration_tests
 run_integration_tests:
-	echo "### Starting integration tests with Kubernetes version: $(KUBERNETES_VERSION) ###"
+	@ echo "### Starting integration tests with Kubernetes version: $(KUBERNETES_VERSION) ###"
 	cd integration_tests && KUBECTL=$(KUBECTL) go test -count 1 -v "$$INTEGRATION_TEST_FLAGS"
 
 .PHONY: clean_integration_tests
