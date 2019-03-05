@@ -140,20 +140,17 @@ main() {
 
     echo_or_run --with-kubectl-dry-run "$KUBECTL apply -f $MANIFESTS_FILE"
 
-    verify_webhook_ready() {
-        local SERVICE_IP HTTP_CODE
-
-        if SERVICE_IP="$($KUBECTL -n $NAMESPACE get service $NAME -o=jsonpath='{.spec.clusterIP}')" \
-                && HTTP_CODE="$(docker exec kube-master curl -kso /dev/null -w '%{http_code}' https://$SERVICE_IP/health)"; then
-            echo "HTTP code from hitting the health endpoint: $HTTP_CODE"
-            [[ "$HTTP_CODE" == '204' ]]
-        else
-            return 1
-        fi
-    }
-    wait_for verify_webhook_ready 'webhook not ready'
-
     if ! $DRY_RUN; then
+        verify_webhook_ready() {
+            local READY
+            if READY="$($KUBECTL -n "$NAMESPACE" get pod --selector=app=$NAME -o=jsonpath='{.items[0].status.containerStatuses[0].ready}' 2> /dev/null)"; then
+                [[ "$READY" == 'true' ]]
+            else
+                return 1
+            fi
+        }
+        wait_for verify_webhook_ready 'webhook not ready'
+
         info 'Windows GMSA Admission Webhook successfully deployed!'
         info "You can remove it by running $KUBECTL delete -f $MANIFESTS_FILE"
     fi

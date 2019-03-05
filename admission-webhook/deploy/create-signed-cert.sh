@@ -126,7 +126,7 @@ EOF
 echo_or_run --with-kubectl-dry-run "$KUBECTL create -f - <<< '$CSR_CONTENTS'"
 
 if ! $DRY_RUN; then
-    verify_csr_created() { $KUBECTL get csr "$CSR_NAME"; }
+    verify_csr_created() { $KUBECTL get csr "$CSR_NAME" 2>&1 ; }
     wait_for verify_csr_created "CSR $CSR_NAME not properly created"
 fi
 

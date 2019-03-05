@@ -11,6 +11,7 @@ env:
   - T=integration KUBERNETES_VERSION=1.13
   - T=integration DEPLOY_METHOD=download
   - T=integration WITH_DEV_IMAGE=1
+  - T=dry_run_deploy
 
 install:
   - curl https://glide.sh/get | sh
