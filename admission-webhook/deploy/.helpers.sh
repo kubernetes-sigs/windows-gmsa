@@ -69,7 +69,11 @@ wait_for() {
         sleep 1
     done
 
-    fatal_error "$ERROR_MSG, giving up after $MAX_ATTEMPTS attempts - last attempt's output: $OUTPUT"
+    local MSG="$ERROR_MSG, giving up after $MAX_ATTEMPTS attempts"
+    if [ "$OUTPUT" ]; then
+        MSG+=" - last attempt's output: $OUTPUT"
+    fi
+    fatal_error "$MSG"
 }
 
 SERVER_KEY="$CERTS_DIR/server-key.pem"

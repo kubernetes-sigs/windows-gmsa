@@ -5,7 +5,22 @@
 
 set -e
 
-function run_integration_tests() {
+KUBECTL=~/.kubeadm-dind-cluster/kubectl
+
+main() {
+    case "$T" in
+        unit)
+            make unit_tests ;;
+        integration)
+            run_integration_tests ;;
+        dry_run_deploy)
+            run_dry_run_deploy ;;
+        *)
+            echo "Unknown test option: $T" && exit 1 ;;
+    esac
+}
+
+run_integration_tests() {
     if [[ "$DEPLOY_METHOD" == 'download' ]]; then
         export K8S_GMSA_DEPLOY_METHOD='download'
 
@@ -26,7 +41,6 @@ function run_integration_tests() {
         make integration_tests_with_dev_image
 
         # for good measure let's check that one can change and restart the webhook when using the dev image
-        local KUBECTL=~/.kubeadm-dind-cluster/kubectl
         local BOGUS_VERSION='cannotbeavalidversion'
 
         local POD_NAME
@@ -51,11 +65,41 @@ function run_integration_tests() {
     fi
 }
 
-case "$T" in
-    unit)
-        make unit_tests ;;
-    integration)
-        run_integration_tests ;;
-    *)
-        echo "Unknown test option: $T" && exit 1 ;;
-esac
+# performs a dry-run deploy and ensures no changes have been made to the cluster
+run_dry_run_deploy() {
+    make cluster_start
+
+    local SNAPSHOT_DIR='k8s_snapshot'
+    k8s_snapshot $SNAPSHOT_DIR/before
+
+    KUBECTL=$KUBECTL ./deploy/deploy-gmsa-webhook.sh --file gmsa-webhook.yml --dry-run
+
+    k8s_snapshot $SNAPSHOT_DIR/after
+
+    diff $SNAPSHOT_DIR/{before,after}
+}
+
+# lists all API objects present on a k8s master node and saves them to the folder given as 1st argument
+# that dir shouldn't exist prior to calling the function
+k8s_snapshot() {
+    local DIR="$1"
+    [ "$DIR" ] && [ ! -d "$DIR" ] || return 1
+    mkdir -p "$DIR"
+
+    local RESOURCE OUTPUT EXIT_STATUS
+    for RESOURCE in $($KUBECTL api-resources -o name); do
+        EXIT_STATUS=0
+        # this output is guaranteed to be unique since namespaces can't contain spaces
+        OUTPUT="$($KUBECTL get "$RESOURCE" --all-namespaces -o jsonpath='{range .items[*]}{@.metadata.namespace}{" "}{@.metadata.name}{"\n"}{end}' 2>&1)" \
+            || EXIT_STATUS=$?
+
+        if [[ $EXIT_STATUS == 0 ]]; then
+            echo "$OUTPUT" | sort > "$DIR/$RESOURCE"
+        elif [[ "$OUTPUT" != *'(NotFound)'* ]] && [[ "$OUTPUT" != *'(MethodNotAllowed)'* ]]; then
+            echo "Error when listing k8s resource $RESOURCE: $OUTPUT"
+            return $EXIT_STATUS
+        fi
+    done
+}
+
+main "$@"
