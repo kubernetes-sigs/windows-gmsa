@@ -37,6 +37,9 @@ const (
 	// credential spec for containers that do not have their own specific GMSA cred spec name
 	// set via a gMSAContainerSpecNameAnnotationKeySuffix annotation as explained above
 	gMSAPodSpecNameAnnotationKey = gMSAPodSpecContentsAnnotationKey + "-name"
+
+	contentTypeHeader = "Content-Type"
+	jsonContentType   = "application/json"
 )
 
 type webhook struct {
@@ -112,7 +115,7 @@ func (webhook *webhook) stop() error {
 
 // ServeHTTP makes this object a http.Handler; its job is handling the HTTP routing: paths,
 // methods and content-type headers.
-// Since we only have a couple of endpoints, there's no need for a full-fledged router here.
+// Since we only have a handful of endpoints, there's no need for a full-fledged router here.
 func (webhook *webhook) ServeHTTP(responseWriter http.ResponseWriter, request *http.Request) {
 	var operation webhookOperation
 
@@ -121,6 +124,12 @@ func (webhook *webhook) ServeHTTP(responseWriter http.ResponseWriter, request *h
 		operation = validate
 	case "/mutate":
 		operation = mutate
+	case "/info":
+		writeJSONBody(responseWriter, map[string]string{"version": getVersion()})
+		return
+	case "/health":
+		responseWriter.WriteHeader(http.StatusNoContent)
+		return
 	default:
 		abortHTTPRequest(responseWriter, http.StatusNotFound, "received %s request for unknown path %s", request.Method, request.URL.Path)
 		return
@@ -132,28 +141,35 @@ func (webhook *webhook) ServeHTTP(responseWriter http.ResponseWriter, request *h
 		return
 	}
 	// verify the content type is JSON
-	if contentType := request.Header.Get("Content-Type"); contentType != "application/json" {
+	if contentType := request.Header.Get(contentTypeHeader); contentType != jsonContentType {
 		abortHTTPRequest(responseWriter, http.StatusUnsupportedMediaType, "expected JSON content-type header for %s request, got %q", operation, contentType)
 		return
 	}
 
 	admissionResponse := webhook.httpRequestToAdmissionResponse(request, operation)
 	responseAdmissionReview := admissionv1beta1.AdmissionReview{Response: admissionResponse}
-	if responseBytes, err := json.Marshal(responseAdmissionReview); err == nil {
-		logrus.Debugf("sending response: %s", responseBytes)
 
-		if _, err = responseWriter.Write(responseBytes); err != nil {
-			abortHTTPRequest(responseWriter, http.StatusInternalServerError, "error when writing response JSON %s: %v", responseBytes, err)
-		}
-	} else {
-		abortHTTPRequest(responseWriter, http.StatusInternalServerError, "error when marshalling response %v: %v", responseAdmissionReview, err)
-	}
+	writeJSONBody(responseWriter, responseAdmissionReview)
 }
 
 // abortHTTPRequest is called for low-level HTTP errors (routing or writing the body)
 func abortHTTPRequest(responseWriter http.ResponseWriter, httpCode int, logMsg string, logArs ...interface{}) {
 	logrus.Infof(logMsg, logArs...)
 	responseWriter.WriteHeader(httpCode)
+}
+
+// writeJsonBody writes a JSON object to an HTTP response.
+func writeJSONBody(responseWriter http.ResponseWriter, jsonBody interface{}) {
+	if responseBytes, err := json.Marshal(jsonBody); err == nil {
+		logrus.Debugf("sending response: %s", responseBytes)
+
+		responseWriter.Header().Set(contentTypeHeader, jsonContentType)
+		if _, err = responseWriter.Write(responseBytes); err != nil {
+			abortHTTPRequest(responseWriter, http.StatusInternalServerError, "error when writing response JSON %s: %v", responseBytes, err)
+		}
+	} else {
+		abortHTTPRequest(responseWriter, http.StatusInternalServerError, "error when marshalling response %v: %v", jsonBody, err)
+	}
 }
 
 // httpRequestToAdmissionResponse turns a raw HTTP request into an AdmissionResponse struct.

@@ -1,0 +1,22 @@
+# a sample cred spec
+
+apiVersion: windows.k8s.io/v1alpha1
+kind: GMSACredentialSpec
+metadata:
+  name: {{ index .CredSpecNames 1 }}
+credspec:
+  ActiveDirectoryConfig:
+    GroupManagedServiceAccounts:
+    - Name: WebApplication1
+      Scope: CONTOSO
+    - Name: WebApplication1
+      Scope: contoso.com
+  CmsPlugins:
+  - ActiveDirectory
+  DomainJoinConfig:
+    DnsName: contoso.com
+    DnsTreeName: contoso.com
+    Guid: 244818ae-87ca-4fcd-92ec-e79e5252348a
+    MachineAccountName: WebApplication1
+    NetBiosName: CONTOSO
+    Sid: S-1-5-21-2126729477-2524175714-3194792973

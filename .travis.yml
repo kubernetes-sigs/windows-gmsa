@@ -1,7 +1,16 @@
 language: go
 
+# must stay consistent with make/image.mk's GO_VERSION
 go:
   - 1.12
+
+env:
+  - T=unit
+  - T=integration KUBERNETES_VERSION=1.11
+  - T=integration KUBERNETES_VERSION=1.12
+  - T=integration KUBERNETES_VERSION=1.13
+  - T=integration DEPLOY_METHOD=download
+  - T=integration WITH_DEV_IMAGE=1
 
 install:
   - curl https://glide.sh/get | sh
@@ -13,4 +22,4 @@ cache:
     - ~/.glide
 
 script:
-  - cd $TRAVIS_BUILD_DIR/admission-webhook && make test
+  - cd $TRAVIS_BUILD_DIR/admission-webhook && ./.travis.sh

@@ -46,6 +46,7 @@ while [[ $# -gt 0 ]]; do
         --overwrite)
             OVERWRITE=true && shift ;;
         *)
+            echo "Unknown option: $1"
             usage ;;
     esac
 done
@@ -61,24 +62,6 @@ fi
 if [ ! -x "$(command -v openssl)" ]; then
     fatal_error 'openssl not found'
 fi
-
-wait_for() {
-    local FUN="$1"
-    local ERROR_MSG="$2"
-    local MAX_ATTEMPTS="$3"
-    [ "$MAX_ATTEMPTS" ] || MAX_ATTEMPTS=30
-
-    local OUTPUT
-    for _ in $(seq "$MAX_ATTEMPTS"); do
-        if OUTPUT=$($FUN); then
-            echo "$OUTPUT"
-            return
-        fi
-        sleep 1
-    done
-
-    fatal_error "$ERROR_MSG, giving up after $MAX_ATTEMPTS attempts"
-}
 
 gen_file() {
     local FUN="$1"

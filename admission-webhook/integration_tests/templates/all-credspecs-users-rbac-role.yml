@@ -1,0 +1,10 @@
+# an RBAC role to grant `use` access to all credspecs
+
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: {{ .ClusterRoleName }}
+rules:
+- apiGroups: ["windows.k8s.io"]
+  resources: ["gmsacredentialspecs"]
+  verbs: ["use"]

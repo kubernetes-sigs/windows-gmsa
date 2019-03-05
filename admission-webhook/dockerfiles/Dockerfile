@@ -10,7 +10,8 @@ COPY /vendor ./vendor
 
 # build
 COPY *.go ./
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s"
+ARG VERSION
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s -X main.version=${VERSION}"
 
 ###
 
