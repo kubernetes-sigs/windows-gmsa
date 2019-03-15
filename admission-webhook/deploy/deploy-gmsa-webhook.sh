@@ -115,6 +115,14 @@ main() {
     $OVERWRITE && CREATE_CERT_CMD+=" --overwrite" || true
     eval "K8S_WINDOWS_GMSA_HELPER_SCRIPT='$HELPER_SCRIPT' $CREATE_CERT_CMD"
 
+    # create the CRD
+    local CRD_MANIFEST_PATH=$(ensure_helper_file_present 'gmsa-crd.yml')
+    local CRD_MANIFEST_CONTENTS=$(cat "$CRD_MANIFEST_PATH")
+    if ! $DRY_RUN && $KUBECTL get crd gmsacredentialspecs.windows.k8s.io &> /dev/null; then
+        $KUBECTL delete crd gmsacredentialspecs.windows.k8s.io
+    fi
+    echo_or_run --with-kubectl-dry-run "$KUBECTL create -f - <<< '$CRD_MANIFEST_CONTENTS'"
+
     # then render the template for the rest of the resources
     local TEMPLATE_PATH
     TEMPLATE_PATH=$(ensure_helper_file_present 'gmsa-webhook.yml.tpl')

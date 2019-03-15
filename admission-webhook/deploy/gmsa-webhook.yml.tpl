@@ -128,27 +128,6 @@ spec:
 
 ---
 
-# declare the CRD to be used
-apiVersion: apiextensions.k8s.io/v1beta1
-kind: CustomResourceDefinition
-metadata:
-  name: gmsacredentialspecs.windows.k8s.io
-spec:
-  group: windows.k8s.io
-  version: v1alpha1
-  names:
-    kind: GMSACredentialSpec
-    plural: gmsacredentialspecs
-  scope: Cluster
-  validation:
-    openAPIV3Schema:
-      properties:
-        credspec:
-          description: GMSA Credential Spec
-          type: object
-
----
-
 apiVersion: admissionregistration.k8s.io/v1beta1
 kind: ValidatingWebhookConfiguration
 metadata:
