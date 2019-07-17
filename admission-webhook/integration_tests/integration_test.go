@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -27,8 +28,8 @@ const (
 	ymlExtension = ".yml"
 )
 
-func TestHappyPathWithPodLevelAnnotation(t *testing.T) {
-	testName := "happy-path-with-pod-level-annotation"
+func TestHappyPathWithPodLevelCredSpec(t *testing.T) {
+	testName := "happy-path-with-pod-level-cred-spec"
 	credSpecTemplates := []string{"credspec-0"}
 	templates := []string{"credspecs-users-rbac-role", "service-account", "sa-rbac-binding", "simple-with-gmsa"}
 
@@ -37,11 +38,11 @@ func TestHappyPathWithPodLevelAnnotation(t *testing.T) {
 
 	pod := waitForPodToComeUp(t, testConfig.Namespace, "app="+testName)
 
-	assert.Equal(t, expectedCredSpec0, pod.Annotations["pod.alpha.windows.kubernetes.io/gmsa-credential-spec"])
+	assert.Equal(t, expectedCredSpec0, extractPodCredSpecContents(t, pod))
 }
 
-func TestHappyPathWithContainerLevelAnnotation(t *testing.T) {
-	testName := "happy-path-with-container-level-annotation"
+func TestHappyPathWithContainerLevelCredSpec(t *testing.T) {
+	testName := "happy-path-with-container-cred-spec"
 	credSpecTemplates := []string{"credspec-0"}
 	templates := []string{"credspecs-users-rbac-role", "service-account", "sa-rbac-binding", "simple-with-container-level-gmsa"}
 
@@ -50,7 +51,7 @@ func TestHappyPathWithContainerLevelAnnotation(t *testing.T) {
 
 	pod := waitForPodToComeUp(t, testConfig.Namespace, "app="+testName)
 
-	assert.Equal(t, expectedCredSpec0, pod.Annotations["nginx.container.alpha.windows.kubernetes.io/gmsa-credential-spec"])
+	assert.Equal(t, expectedCredSpec0, extractContainerCredSpecContents(t, pod, "nginx"))
 }
 
 func TestHappyPathWithSeveralContainers(t *testing.T) {
@@ -63,29 +64,30 @@ func TestHappyPathWithSeveralContainers(t *testing.T) {
 
 	pod := waitForPodToComeUp(t, testConfig.Namespace, "app="+testName)
 
-	assert.Equal(t, expectedCredSpec0, pod.Annotations["nginx0.container.alpha.windows.kubernetes.io/gmsa-credential-spec"])
-	assert.Equal(t, expectedCredSpec1, pod.Annotations["pod.alpha.windows.kubernetes.io/gmsa-credential-spec"])
-	assert.Equal(t, expectedCredSpec2, pod.Annotations["nginx2.container.alpha.windows.kubernetes.io/gmsa-credential-spec"])
+	assert.Equal(t, expectedCredSpec0, extractContainerCredSpecContents(t, pod, "nginx0"))
+	assert.Equal(t, expectedCredSpec1, extractPodCredSpecContents(t, pod))
+	assert.Equal(t, expectedCredSpec2, extractContainerCredSpecContents(t, pod, "nginx2"))
 }
 
-func TestHappyPathWithPreSetMatchingAnnotations(t *testing.T) {
-	testName := "happy-path-with-pre-set-matching-annotations"
+func TestHappyPathWithPreSetMatchingContents(t *testing.T) {
+	testName := "happy-path-with-pre-set-matching-contents"
 	credSpecTemplates := []string{"credspec-0"}
-	templates := []string{"credspecs-users-rbac-role", "service-account", "sa-rbac-binding", "simple-with-pre-set-matching-annotations"}
+	templates := []string{"credspecs-users-rbac-role", "service-account", "sa-rbac-binding", "simple-with-pre-set-matching-contents"}
 
 	testConfig, tearDownFunc := integrationTestSetup(t, testName, credSpecTemplates, templates)
 	defer tearDownFunc()
 
 	pod := waitForPodToComeUp(t, testConfig.Namespace, "app="+testName)
 
-	assert.NotEqual(t, expectedCredSpec0, pod.Annotations["pod.alpha.windows.kubernetes.io/gmsa-credential-spec"])
+	actualCredSpecContents := extractPodCredSpecContents(t, pod)
+	assert.NotEqual(t, expectedCredSpec0, actualCredSpecContents)
 
 	var (
 		expectedCredSpec map[string]interface{}
 		actualCredSpec   map[string]interface{}
 	)
 	if assert.Nil(t, json.Unmarshal([]byte(expectedCredSpec0), &expectedCredSpec)) &&
-		assert.Nil(t, json.Unmarshal([]byte(pod.Annotations["pod.alpha.windows.kubernetes.io/gmsa-credential-spec"]), &actualCredSpec)) {
+		assert.Nil(t, json.Unmarshal([]byte(actualCredSpecContents), &actualCredSpec)) {
 		assert.True(t, reflect.DeepEqual(expectedCredSpec, actualCredSpec))
 	}
 }
@@ -105,7 +107,7 @@ func TestServiceAccountDoesNotHavePermissionsToUseCredSpec(t *testing.T) {
 
 		assert.Equal(t, condition.Reason, "FailedCreate")
 
-		expectedSubstr := fmt.Sprintf("service account %s is not authorized `use` gMSA cred spec %s", testConfig.ServiceAccountName, testConfig.CredSpecNames[0])
+		expectedSubstr := fmt.Sprintf("service account %q is not authorized to `use` GMSA cred spec %q", testConfig.ServiceAccountName, testConfig.CredSpecNames[0])
 		assert.Contains(t, condition.Message, expectedSubstr)
 	}
 }
@@ -128,10 +130,10 @@ func TestCredSpecDoesNotExist(t *testing.T) {
 	}
 }
 
-func TestCannotPreSetGMSAPodLevelContentsAnnotationsWithoutNameAnnotations(t *testing.T) {
-	testName := "cannot-pre-set-gmsa-pod-level-contents-annotations"
+func TestCannotPreSetGMSAPodLevelContentsWithoutName(t *testing.T) {
+	testName := "cannot-pre-set-gmsa-pod-level-contents-without-name"
 	credSpecTemplates := []string{"credspec-0"}
-	templates := []string{"all-credspecs-users-rbac-role", "service-account", "sa-rbac-binding", "simple-with-preset-gmsa-pod-level-contents-annotation"}
+	templates := []string{"all-credspecs-users-rbac-role", "service-account", "sa-rbac-binding", "simple-with-preset-gmsa-pod-level-contents"}
 
 	testConfig, tearDownFunc := integrationTestSetup(t, testName, credSpecTemplates, templates)
 	defer tearDownFunc()
@@ -143,14 +145,14 @@ func TestCannotPreSetGMSAPodLevelContentsAnnotationsWithoutNameAnnotations(t *te
 
 		assert.Equal(t, condition.Reason, "FailedCreate")
 
-		assert.Contains(t, condition.Message, "cannot pre-set a pod's gMSA contents annotation (annotation \"pod.alpha.windows.kubernetes.io/gmsa-credential-spec\" present) without setting the corresponding name annotation")
+		assert.Contains(t, condition.Message, "has a GMSA cred spec set, but does not define the name of the corresponding resource")
 	}
 }
 
-func TestCannotPreSetGMSAContainerLevelContentsAnnotationsWithoutNameAnnotations(t *testing.T) {
-	testName := "cannot-pre-set-gmsa-container-level-contents-annotations"
+func TestCannotPreSetGMSAContainerLevelContentsWithoutName(t *testing.T) {
+	testName := "cannot-pre-set-gmsa-container-level-contents-without-name"
 	credSpecTemplates := []string{"credspec-0"}
-	templates := []string{"all-credspecs-users-rbac-role", "service-account", "sa-rbac-binding", "simple-with-preset-gmsa-container-level-contents-annotation"}
+	templates := []string{"all-credspecs-users-rbac-role", "service-account", "sa-rbac-binding", "simple-with-preset-gmsa-container-level-contents"}
 
 	testConfig, tearDownFunc := integrationTestSetup(t, testName, credSpecTemplates, templates)
 	defer tearDownFunc()
@@ -162,14 +164,14 @@ func TestCannotPreSetGMSAContainerLevelContentsAnnotationsWithoutNameAnnotations
 
 		assert.Equal(t, condition.Reason, "FailedCreate")
 
-		assert.Contains(t, condition.Message, "cannot pre-set a pod's gMSA contents annotation (annotation \"nginx.container.alpha.windows.kubernetes.io/gmsa-credential-spec\" present) without setting the corresponding name annotation")
+		assert.Contains(t, condition.Message, "has a GMSA cred spec set, but does not define the name of the corresponding resource")
 	}
 }
 
-func TestCannotPreSetUnmatchingGMSAAnnotations(t *testing.T) {
-	testName := "cannot-pre-set-unmatching-gmsa-annotations"
+func TestCannotPreSetUnmatchingGMSASettings(t *testing.T) {
+	testName := "cannot-pre-set-unmatching-gmsa-settings"
 	credSpecTemplates := []string{"credspec-0"}
-	templates := []string{"all-credspecs-users-rbac-role", "service-account", "sa-rbac-binding", "simple-with-pre-set-unmatching-annotations"}
+	templates := []string{"all-credspecs-users-rbac-role", "service-account", "sa-rbac-binding", "simple-with-pre-set-unmatching-contents"}
 
 	testConfig, tearDownFunc := integrationTestSetup(t, testName, credSpecTemplates, templates)
 	defer tearDownFunc()
@@ -181,13 +183,13 @@ func TestCannotPreSetUnmatchingGMSAAnnotations(t *testing.T) {
 
 		assert.Equal(t, condition.Reason, "FailedCreate")
 
-		expectedSubstr := fmt.Sprintf("cred spec contained in annotation \"pod.alpha.windows.kubernetes.io/gmsa-credential-spec\" does not match the contents of GMSA %q", testConfig.CredSpecNames[0])
+		expectedSubstr := fmt.Sprintf("does not match the contents of GMSA resource %q", testConfig.CredSpecNames[0])
 		assert.Contains(t, condition.Message, expectedSubstr)
 	}
 }
 
-func TestCannotUpdateExistingPodLevelGMSAAnnotations(t *testing.T) {
-	testName := "cannot-update-gmsa-pod-level-annotations"
+func TestCannotUpdateExistingPodLevelGMSASettings(t *testing.T) {
+	testName := "cannot-update-gmsa-pod-level-settings"
 	credSpecTemplates := []string{"credspec-0"}
 	singlePodTemplate := "single-pod-with-gmsa"
 	templates := []string{"credspecs-users-rbac-role", "service-account", "sa-rbac-binding", singlePodTemplate}
@@ -200,30 +202,24 @@ func TestCannotUpdateExistingPodLevelGMSAAnnotations(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, expectedCredSpec0, pod.Annotations["pod.alpha.windows.kubernetes.io/gmsa-credential-spec"])
+	assert.Equal(t, expectedCredSpec0, extractPodCredSpecContents(t, pod))
 
-	// now let's try to update the content annotation
-	testConfig.ExtraAnnotations = map[string]template.HTML{
-		"pod.alpha.windows.kubernetes.io/gmsa-credential-spec": template.HTML("'" + expectedCredSpec1 + "'"),
-	}
+	// now let's try to update the cred spec's content
+	testConfig.CredSpecContent = expectedCredSpec1
+	defer func() { testConfig.CredSpecContent = "" }()
 	renderedTemplate := renderTemplate(t, testConfig, singlePodTemplate)
-	success, _, stderr := applyManifest(t, renderedTemplate)
-	if assert.False(t, success) {
-		assert.Contains(t, stderr, "cannot update an existing pod's gMSA annotation (annotation pod.alpha.windows.kubernetes.io/gmsa-credential-spec changed)")
-	}
-	testConfig.ExtraAnnotations = nil
+	success, _, _ := applyManifest(t, renderedTemplate)
+	assert.False(t, success)
 
-	// and same for the name annotation
+	// and same for its name
 	testConfig.CredSpecNames[0] = "new-credspec"
 	renderedTemplate = renderTemplate(t, testConfig, singlePodTemplate)
-	success, _, stderr = applyManifest(t, renderedTemplate)
-	if assert.False(t, success) {
-		assert.Contains(t, stderr, "cannot update an existing pod's gMSA annotation (annotation pod.alpha.windows.kubernetes.io/gmsa-credential-spec-name changed)")
-	}
+	success, _, _ = applyManifest(t, renderedTemplate)
+	assert.False(t, success)
 }
 
-func TestCannotUpdateExistingContainerLevelGMSAAnnotations(t *testing.T) {
-	testName := "cannot-update-gmsa-container-level-annotations"
+func TestCannotUpdateExistingContainerLevelGMSASettings(t *testing.T) {
+	testName := "cannot-update-gmsa-container-level-settings"
 	credSpecTemplates := []string{"credspec-0"}
 	singlePodTemplate := "single-pod-with-container-level-gmsa"
 	templates := []string{"credspecs-users-rbac-role", "service-account", "sa-rbac-binding", singlePodTemplate}
@@ -236,28 +232,44 @@ func TestCannotUpdateExistingContainerLevelGMSAAnnotations(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, expectedCredSpec0, pod.Annotations[testName+".container.alpha.windows.kubernetes.io/gmsa-credential-spec"])
+	assert.Equal(t, expectedCredSpec0, extractContainerCredSpecContents(t, pod, testName))
 
-	// now let's try to update the content annotation
-	testConfig.ExtraAnnotations = map[string]template.HTML{
-		testName + ".container.alpha.windows.kubernetes.io/gmsa-credential-spec": template.HTML("'" + expectedCredSpec1 + "'"),
-	}
+	// now let's try to update the cred spec's content
+	testConfig.CredSpecContent = expectedCredSpec1
+	defer func() { testConfig.CredSpecContent = "" }()
 	renderedTemplate := renderTemplate(t, testConfig, singlePodTemplate)
-	success, _, stderr := applyManifest(t, renderedTemplate)
-	if assert.False(t, success) {
-		expectedSubstr := fmt.Sprintf("cannot update an existing pod's gMSA annotation (annotation %s.container.alpha.windows.kubernetes.io/gmsa-credential-spec changed)", testName)
-		assert.Contains(t, stderr, expectedSubstr)
-	}
-	testConfig.ExtraAnnotations = nil
+	success, _, _ := applyManifest(t, renderedTemplate)
+	assert.False(t, success)
 
-	// and same for the name annotation
+	// and same for its name
 	testConfig.CredSpecNames[0] = "new-credspec"
 	renderedTemplate = renderTemplate(t, testConfig, singlePodTemplate)
-	success, _, stderr = applyManifest(t, renderedTemplate)
-	if assert.False(t, success) {
-		expectedSubstr := fmt.Sprintf("cannot update an existing pod's gMSA annotation (annotation %s.container.alpha.windows.kubernetes.io/gmsa-credential-spec-name changed)", testName)
-		assert.Contains(t, stderr, expectedSubstr)
+	success, _, _ = applyManifest(t, renderedTemplate)
+	assert.False(t, success)
+}
+
+func TestPossibleToUpdatePodWithExistingGMSASettings(t *testing.T) {
+	testName := "possible-to-update-pod-with-existing-gmsa-settings"
+	credSpecTemplates := []string{"credspec-0", "credspec-1"}
+	singlePodTemplate := "single-pod-with-gmsa"
+	templates := []string{"credspecs-users-rbac-role", "service-account", "sa-rbac-binding", singlePodTemplate}
+
+	testConfig, tearDownFunc := integrationTestSetup(t, testName, credSpecTemplates, templates)
+	defer tearDownFunc()
+
+	// let's check that the pod has come up correctly, and has the correct GMSA cred inlined
+	pod, err := kubeClient(t).CoreV1().Pods(testConfig.Namespace).Get(testName, metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
 	}
+	assert.Equal(t, expectedCredSpec0, extractPodCredSpecContents(t, pod))
+
+	// now let's update this pod
+	testConfig.Image = "nginx"
+	defer func() { testConfig.Image = "" }()
+	renderedTemplate := renderTemplate(t, testConfig, singlePodTemplate)
+	success, _, _ := applyManifest(t, renderedTemplate)
+	assert.True(t, success)
 }
 
 /* Helpers */
@@ -267,10 +279,11 @@ type testConfig struct {
 	Namespace          string
 	TmpDir             string
 	CredSpecNames      []string
+	CredSpecContent    string
 	ClusterRoleName    string
 	ServiceAccountName string
 	RoleBindingName    string
-	ExtraAnnotations   map[string]template.HTML
+	Image              string
 }
 
 // integrationTestSetup creates a new namespace to play in, and returns a function to
@@ -359,4 +372,29 @@ func renderTemplate(t *testing.T, testConfig *testConfig, name string) string {
 	}
 
 	return renderedTemplate.Name()
+}
+
+func extractPodCredSpecContents(t *testing.T, pod *corev1.Pod) string {
+	if pod.Spec.SecurityContext == nil ||
+		pod.Spec.SecurityContext.WindowsOptions == nil ||
+		pod.Spec.SecurityContext.WindowsOptions.GMSACredentialSpec == nil {
+		t.Fatalf("No pod cred spec")
+	}
+	return *pod.Spec.SecurityContext.WindowsOptions.GMSACredentialSpec
+}
+
+func extractContainerCredSpecContents(t *testing.T, pod *corev1.Pod, containerName string) string {
+	for _, container := range pod.Spec.Containers {
+		if container.Name == containerName {
+			if container.SecurityContext == nil ||
+				container.SecurityContext.WindowsOptions == nil ||
+				container.SecurityContext.WindowsOptions.GMSACredentialSpec == nil {
+				t.Fatalf("No cred spec for container %q", containerName)
+			}
+			return *container.SecurityContext.WindowsOptions.GMSACredentialSpec
+		}
+	}
+
+	t.Fatalf("Did not find any container named %q", containerName)
+	panic("won't happen, but required by the compiler")
 }

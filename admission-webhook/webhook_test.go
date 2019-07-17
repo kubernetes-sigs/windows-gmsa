@@ -3,10 +3,8 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"math/rand"
 	"net/http"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -15,16 +13,25 @@ import (
 )
 
 func TestValidateCreateRequest(t *testing.T) {
-	t.Run("with no GMSA annotations, it passes", func(t *testing.T) {
-		webhook := newWebhook(nil)
-		pod := buildPod(nil, dummyServiceAccoutName, dummyContainerName)
+	for testCaseName, winOptionsFactory := range map[string]func() *corev1.WindowsSecurityContextOptions{
+		"with empty GMSA settings": func() *corev1.WindowsSecurityContextOptions {
+			return &corev1.WindowsSecurityContextOptions{}
+		},
+		"with no GMSA settings": func() *corev1.WindowsSecurityContextOptions {
+			return nil
+		},
+	} {
+		t.Run(testCaseName, func(t *testing.T) {
+			webhook := newWebhook(nil)
+			pod := buildPod(dummyServiceAccoutName, winOptionsFactory(), map[string]*corev1.WindowsSecurityContextOptions{dummyContainerName: winOptionsFactory()})
 
-		response, err := webhook.validateCreateRequest(pod, dummyNamespace)
-		assert.Nil(t, err)
+			response, err := webhook.validateCreateRequest(pod, dummyNamespace)
+			assert.Nil(t, err)
 
-		require.NotNil(t, response)
-		assert.True(t, response.Allowed)
-	})
+			require.NotNil(t, response)
+			assert.True(t, response.Allowed)
+		})
+	}
 
 	kubeClientFactory := func() *dummyKubeClient {
 		return &dummyKubeClient{
@@ -39,19 +46,15 @@ func TestValidateCreateRequest(t *testing.T) {
 		}
 	}
 
-	annotationsFactory := func(containerName string) map[string]string {
-		return map[string]string{
-			containerName + ".container.alpha.windows.kubernetes.io/gmsa-credential-spec-name": containerName + "-cred-spec",
-			containerName + ".container.alpha.windows.kubernetes.io/gmsa-credential-spec":      containerName + "-cred-spec-contents",
-		}
+	winOptionsFactory := func(containerName string) *corev1.WindowsSecurityContextOptions {
+		return buildWindowsOptions(containerName+"-cred-spec", containerName+"-cred-spec-contents")
 	}
 
-	runWebhookValidateOrMutateTests(t, annotationsFactory, map[string]webhookValidateOrMutateTest{
-		"with a correct annotation pair, it passes": func(t *testing.T, pod *corev1.Pod, nameKey, contentsKey string) {
+	runWebhookValidateOrMutateTests(t, winOptionsFactory, map[string]webhookValidateOrMutateTest{
+		"with matching name & content, it passes": func(t *testing.T, pod *corev1.Pod, optionsSelector winOptionsSelector, _ gmsaResourceKind, _ string) {
 			webhook := newWebhook(kubeClientFactory())
 
-			pod.Annotations[nameKey] = dummyCredSpecName
-			pod.Annotations[contentsKey] = dummyCredSpecContents
+			setWindowsOptions(optionsSelector(pod), dummyCredSpecName, dummyCredSpecContents)
 
 			response, err := webhook.validateCreateRequest(pod, dummyNamespace)
 			assert.Nil(t, err)
@@ -60,11 +63,14 @@ func TestValidateCreateRequest(t *testing.T) {
 			assert.True(t, response.Allowed)
 		},
 
-		"if the cred spec contents are not byte-to-byte equal to that of the one named, but still represent equivalent JSONs, it passes": func(t *testing.T, pod *corev1.Pod, nameKey, contentsKey string) {
+		"if the cred spec contents are not byte-to-byte equal to that of the one named, but still represent equivalent JSONs, it passes": func(t *testing.T, pod *corev1.Pod, optionsSelector winOptionsSelector, _ gmsaResourceKind, _ string) {
 			webhook := newWebhook(kubeClientFactory())
 
-			pod.Annotations[nameKey] = dummyCredSpecName
-			pod.Annotations[contentsKey] = `{"All in all you're just another":      {"the":"wall","brick":   "in"},"We don't need no":["education", "thought control","dark sarcasm in the classroom"]}`
+			setWindowsOptions(
+				optionsSelector(pod),
+				dummyCredSpecName,
+				`{"All in all you're just another":      {"the":"wall","brick":   "in"},"We don't need no":["education", "thought control","dark sarcasm in the classroom"]}`,
+			)
 
 			response, err := webhook.validateCreateRequest(pod, dummyNamespace)
 			assert.Nil(t, err)
@@ -73,47 +79,51 @@ func TestValidateCreateRequest(t *testing.T) {
 			assert.True(t, response.Allowed)
 		},
 
-		"if the cred spec contents are not that of the one named, it fails": func(t *testing.T, pod *corev1.Pod, nameKey, contentsKey string) {
+		"if the cred spec contents are not that of the one named, it fails": func(t *testing.T, pod *corev1.Pod, optionsSelector winOptionsSelector, resourceKind gmsaResourceKind, resourceName string) {
 			webhook := newWebhook(kubeClientFactory())
 
-			pod.Annotations[nameKey] = dummyCredSpecName
-			pod.Annotations[contentsKey] = `{"We don't need no": ["money"], "All in all you're just another": {"brick": "in", "the": "wall"}}`
+			setWindowsOptions(
+				optionsSelector(pod),
+				dummyCredSpecName,
+				`{"We don't need no": ["money"], "All in all you're just another": {"brick": "in", "the": "wall"}}`,
+			)
 
 			response, err := webhook.validateCreateRequest(pod, dummyNamespace)
 			assert.Nil(t, response)
 
 			assertPodAdmissionErrorContains(t, err, pod, http.StatusUnprocessableEntity,
-				"cred spec contained in annotation %q does not match the contents of GMSA %q",
-				contentsKey, dummyCredSpecName)
+				"the GMSA cred spec contents for %s %q does not match the contents of GMSA resource %q",
+				resourceKind, resourceName, dummyCredSpecName)
 		},
 
-		"if the cred spec contents are not byte-to-byte equal to that of the one named, and are not even a valid JSON object, it fails": func(t *testing.T, pod *corev1.Pod, nameKey, contentsKey string) {
+		"if the cred spec contents are not byte-to-byte equal to that of the one named, and are not even a valid JSON object, it fails": func(t *testing.T, pod *corev1.Pod, optionsSelector winOptionsSelector, resourceKind gmsaResourceKind, resourceName string) {
 			webhook := newWebhook(kubeClientFactory())
 
-			pod.Annotations[nameKey] = dummyCredSpecName
-			pod.Annotations[contentsKey] = "i ain't no JSON object"
+			setWindowsOptions(optionsSelector(pod), dummyCredSpecName, "i ain't no JSON object")
 
 			response, err := webhook.validateCreateRequest(pod, dummyNamespace)
 			assert.Nil(t, response)
 
 			assertPodAdmissionErrorContains(t, err, pod, http.StatusUnprocessableEntity,
-				"cred spec contained in annotation %q does not match the contents of GMSA %q",
-				contentsKey, dummyCredSpecName)
+				"the GMSA cred spec contents for %s %q does not match the contents of GMSA resource %q",
+				resourceKind, resourceName, dummyCredSpecName)
 		},
 
-		"if the contents annotation is set, but the name one isn't, it fails": func(t *testing.T, pod *corev1.Pod, nameKey, contentsKey string) {
+		"if the contents are set, but the name one isn't provided, it fails": func(t *testing.T, pod *corev1.Pod, optionsSelector winOptionsSelector, resourceKind gmsaResourceKind, resourceName string) {
 			webhook := newWebhook(kubeClientFactory())
-			pod.Annotations[contentsKey] = dummyCredSpecContents
+
+			setWindowsOptions(optionsSelector(pod), "", dummyCredSpecContents)
 
 			response, err := webhook.validateCreateRequest(pod, dummyNamespace)
 
 			assert.Nil(t, response)
 
 			assertPodAdmissionErrorContains(t, err, pod, http.StatusUnprocessableEntity,
-				"cannot pre-set a pod's gMSA contents annotation (annotation %q present) without setting the corresponding name annotation", contentsKey)
+				"%s %q has a GMSA cred spec set, but does not define the name of the corresponding resource",
+				resourceKind, resourceName)
 		},
 
-		"if the service account is not authorized to use the cred-spec, it fails": func(t *testing.T, pod *corev1.Pod, nameKey, contentsKey string) {
+		"if the service account is not authorized to use the cred-spec, it fails": func(t *testing.T, pod *corev1.Pod, optionsSelector winOptionsSelector, _ gmsaResourceKind, _ string) {
 			dummyReason := "dummy reason"
 
 			client := kubeClientFactory()
@@ -130,18 +140,17 @@ func TestValidateCreateRequest(t *testing.T) {
 
 			webhook := newWebhook(client)
 
-			pod.Annotations[nameKey] = dummyCredSpecName
-			pod.Annotations[contentsKey] = dummyCredSpecContents
+			setWindowsOptions(optionsSelector(pod), dummyCredSpecName, dummyCredSpecContents)
 
 			response, err := webhook.validateCreateRequest(pod, dummyNamespace)
 			assert.Nil(t, response)
 
 			assertPodAdmissionErrorContains(t, err, pod, http.StatusForbidden,
-				"service account %s is not authorized `use` gMSA cred spec %s, reason: %q",
+				"service account %q is not authorized to `use` GMSA cred spec %q, reason: %q",
 				dummyServiceAccoutName, dummyCredSpecName, dummyReason)
 		},
 
-		"if there is an error when retrieving the cred-spec's contents, it fails": func(t *testing.T, pod *corev1.Pod, nameKey, contentsKey string) {
+		"if there is an error when retrieving the cred-spec's contents, it fails": func(t *testing.T, pod *corev1.Pod, optionsSelector winOptionsSelector, _ gmsaResourceKind, _ string) {
 			dummyError := fmt.Errorf("dummy error")
 
 			client := kubeClientFactory()
@@ -155,8 +164,7 @@ func TestValidateCreateRequest(t *testing.T) {
 
 			webhook := newWebhook(client)
 
-			pod.Annotations[nameKey] = dummyCredSpecName
-			pod.Annotations[contentsKey] = dummyCredSpecContents
+			setWindowsOptions(optionsSelector(pod), dummyCredSpecName, dummyCredSpecContents)
 
 			response, err := webhook.validateCreateRequest(pod, dummyNamespace)
 
@@ -168,16 +176,25 @@ func TestValidateCreateRequest(t *testing.T) {
 }
 
 func TestMutateCreateRequest(t *testing.T) {
-	t.Run("with no GMSA annotations, it passes and does nothing", func(t *testing.T) {
-		webhook := newWebhook(nil)
-		pod := buildPod(nil, dummyServiceAccoutName, dummyContainerName)
+	for testCaseName, winOptionsFactory := range map[string]func() *corev1.WindowsSecurityContextOptions{
+		"with empty GMSA settings, it passes and does nothing": func() *corev1.WindowsSecurityContextOptions {
+			return &corev1.WindowsSecurityContextOptions{}
+		},
+		"with no GMSA settings, it passes and does nothing": func() *corev1.WindowsSecurityContextOptions {
+			return nil
+		},
+	} {
+		t.Run(testCaseName, func(t *testing.T) {
+			webhook := newWebhook(nil)
+			pod := buildPod(dummyServiceAccoutName, winOptionsFactory(), map[string]*corev1.WindowsSecurityContextOptions{dummyContainerName: winOptionsFactory()})
 
-		response, err := webhook.validateCreateRequest(pod, dummyNamespace)
-		assert.Nil(t, err)
+			response, err := webhook.mutateCreateRequest(pod)
+			assert.Nil(t, err)
 
-		require.NotNil(t, response)
-		assert.True(t, response.Allowed)
-	})
+			require.NotNil(t, response)
+			assert.True(t, response.Allowed)
+		})
+	}
 
 	kubeClientFactory := func() *dummyKubeClient {
 		return &dummyKubeClient{
@@ -192,17 +209,15 @@ func TestMutateCreateRequest(t *testing.T) {
 		}
 	}
 
-	annotationsFactory := func(containerName string) map[string]string {
-		return map[string]string{
-			containerName + ".container.alpha.windows.kubernetes.io/gmsa-credential-spec-name": containerName + "-cred-spec",
-		}
+	winOptionsFactory := func(containerName string) *corev1.WindowsSecurityContextOptions {
+		return buildWindowsOptions(containerName+"-cred-spec", "")
 	}
 
-	runWebhookValidateOrMutateTests(t, annotationsFactory, map[string]webhookValidateOrMutateTest{
-		"with a GMSA name annotation, it passes and inlines the cred-spec's contents": func(t *testing.T, pod *corev1.Pod, nameKey, contentsKey string) {
+	runWebhookValidateOrMutateTests(t, winOptionsFactory, map[string]webhookValidateOrMutateTest{
+		"with a GMSA cred spec name, it passes and inlines the cred-spec's contents": func(t *testing.T, pod *corev1.Pod, optionsSelector winOptionsSelector, resourceKind gmsaResourceKind, resourceName string) {
 			webhook := newWebhook(kubeClientFactory())
 
-			pod.Annotations[nameKey] = dummyCredSpecName
+			setWindowsOptions(optionsSelector(pod), dummyCredSpecName, "")
 
 			response, err := webhook.mutateCreateRequest(pod)
 			assert.Nil(t, err)
@@ -214,20 +229,41 @@ func TestMutateCreateRequest(t *testing.T) {
 				assert.Equal(t, admissionv1beta1.PatchTypeJSONPatch, *response.PatchType)
 			}
 
+			patchPath := func(kind gmsaResourceKind, name string) string {
+				partialPath := ""
+
+				if kind == containerKind {
+					containerIndex := -1
+					for i, container := range pod.Spec.Containers {
+						if container.Name == name {
+							containerIndex = i
+							break
+						}
+					}
+					if containerIndex == -1 {
+						t.Fatalf("Did not find any container named %q", name)
+					}
+
+					partialPath = fmt.Sprintf("/containers/%d", containerIndex)
+				}
+
+				return fmt.Sprintf("/spec%s/securityContext/windowsOptions/gmsaCredentialSpec", partialPath)
+			}
+
 			// maps the contents to the expected patch for that container
 			expectedPatches := make(map[string]map[string]string)
 			for i := 0; i < len(pod.Spec.Containers)-1; i++ {
 				credSpecContents := extraContainerName(i) + "-cred-spec-contents"
 				expectedPatches[credSpecContents] = map[string]string{
 					"op":    "add",
-					"path":  fmt.Sprintf("/metadata/annotations/%s.container.alpha.windows.kubernetes.io~1gmsa-credential-spec", extraContainerName(i)),
+					"path":  patchPath(containerKind, extraContainerName(i)),
 					"value": credSpecContents,
 				}
 			}
 			// and the patch for this test's specific cred spec
 			expectedPatches[dummyCredSpecContents] = map[string]string{
 				"op":    "add",
-				"path":  fmt.Sprintf("/metadata/annotations/%s", jsonPatchEscape(contentsKey)),
+				"path":  patchPath(resourceKind, resourceName),
 				"value": dummyCredSpecContents,
 			}
 
@@ -243,11 +279,10 @@ func TestMutateCreateRequest(t *testing.T) {
 			}
 		},
 
-		"it the contents annotation is already set, along with the name one, it passes and doesn't overwrite the provided contents": func(t *testing.T, pod *corev1.Pod, nameKey, contentsKey string) {
+		"it the cred spec's contents are already set, along with its name, it passes and doesn't overwrite the provided contents": func(t *testing.T, pod *corev1.Pod, optionsSelector winOptionsSelector, _ gmsaResourceKind, _ string) {
 			webhook := newWebhook(kubeClientFactory())
 
-			pod.Annotations[nameKey] = dummyCredSpecName
-			pod.Annotations[contentsKey] = `{"pre-set GMSA": "cred contents"}`
+			setWindowsOptions(optionsSelector(pod), dummyCredSpecName, `{"pre-set GMSA": "cred contents"}`)
 
 			response, err := webhook.mutateCreateRequest(pod)
 			assert.Nil(t, err)
@@ -270,7 +305,7 @@ func TestMutateCreateRequest(t *testing.T) {
 			}
 		},
 
-		"if there is an error when retrieving the cred-spec's contents, it fails": func(t *testing.T, pod *corev1.Pod, nameKey, contentsKey string) {
+		"if there is an error when retrieving the cred-spec's contents, it fails": func(t *testing.T, pod *corev1.Pod, optionsSelector winOptionsSelector, _ gmsaResourceKind, _ string) {
 			dummyError := fmt.Errorf("dummy error")
 
 			client := kubeClientFactory()
@@ -284,7 +319,7 @@ func TestMutateCreateRequest(t *testing.T) {
 
 			webhook := newWebhook(client)
 
-			pod.Annotations[nameKey] = dummyCredSpecName
+			setWindowsOptions(optionsSelector(pod), dummyCredSpecName, "")
 
 			response, err := webhook.mutateCreateRequest(pod)
 
@@ -296,28 +331,33 @@ func TestMutateCreateRequest(t *testing.T) {
 }
 
 func TestValidateUpdateRequest(t *testing.T) {
-	t.Run("with no GMSA annotations, it passes and does nothing", func(t *testing.T) {
-		pod := buildPod(nil, dummyServiceAccoutName, dummyContainerName)
-		oldPod := buildPod(nil, dummyServiceAccoutName, dummyContainerName)
+	for testCaseName, winOptionsFactory := range map[string]func() *corev1.WindowsSecurityContextOptions{
+		"with empty GMSA settings, it passes and does nothing": func() *corev1.WindowsSecurityContextOptions {
+			return &corev1.WindowsSecurityContextOptions{}
+		},
+		"with no GMSA settings, it passes and does nothing": func() *corev1.WindowsSecurityContextOptions {
+			return nil
+		},
+	} {
+		t.Run(testCaseName, func(t *testing.T) {
+			pod := buildPod(dummyServiceAccoutName, winOptionsFactory(), map[string]*corev1.WindowsSecurityContextOptions{dummyContainerName: winOptionsFactory()})
+			oldPod := buildPod(dummyServiceAccoutName, winOptionsFactory(), map[string]*corev1.WindowsSecurityContextOptions{dummyContainerName: winOptionsFactory()})
 
-		response, err := validateUpdateRequest(pod, oldPod)
-		assert.Nil(t, err)
+			response, err := validateUpdateRequest(pod, oldPod)
+			assert.Nil(t, err)
 
-		require.NotNil(t, response)
-		assert.True(t, response.Allowed)
-	})
-
-	annotationsFactory := func(containerName string) map[string]string {
-		return map[string]string{
-			containerName + ".container.alpha.windows.kubernetes.io/gmsa-credential-spec-name": containerName + "-cred-spec",
-			containerName + ".container.alpha.windows.kubernetes.io/gmsa-credential-spec":      containerName + "-cred-spec-contents",
-		}
+			require.NotNil(t, response)
+			assert.True(t, response.Allowed)
+		})
 	}
 
-	runWebhookValidateOrMutateTests(t, annotationsFactory, map[string]webhookValidateOrMutateTest{
-		"if no GMSA annotation has changed, it passes": func(t *testing.T, pod *corev1.Pod, nameKey, contentsKey string) {
-			pod.Annotations[nameKey] = dummyCredSpecName
-			pod.Annotations[contentsKey] = dummyCredSpecContents
+	winOptionsFactory := func(containerName string) *corev1.WindowsSecurityContextOptions {
+		return buildWindowsOptions(containerName+"-cred-spec", containerName+"-cred-spec-contents")
+	}
+
+	runWebhookValidateOrMutateTests(t, winOptionsFactory, map[string]webhookValidateOrMutateTest{
+		"if there was no changes to GMSA settings, it passes": func(t *testing.T, pod *corev1.Pod, optionsSelector winOptionsSelector, _ gmsaResourceKind, _ string) {
+			setWindowsOptions(optionsSelector(pod), dummyCredSpecName, dummyCredSpecContents)
 
 			oldPod := pod.DeepCopy()
 
@@ -328,66 +368,127 @@ func TestValidateUpdateRequest(t *testing.T) {
 			assert.True(t, response.Allowed)
 		},
 
-		"if a name annotation has changed, it fails": func(t *testing.T, pod *corev1.Pod, nameKey, contentsKey string) {
-			pod.Annotations[nameKey] = "new-cred-spec-name"
-			pod.Annotations[contentsKey] = dummyCredSpecContents
+		"if there was a change to a GMSA name, it fails": func(t *testing.T, pod *corev1.Pod, optionsSelector winOptionsSelector, resourceKind gmsaResourceKind, resourceName string) {
+			setWindowsOptions(optionsSelector(pod), "new-cred-spec-name", dummyCredSpecContents)
 
 			oldPod := pod.DeepCopy()
-			oldPod.Annotations[nameKey] = dummyCredSpecName
+			setWindowsOptions(optionsSelector(oldPod), dummyCredSpecName, "")
 
 			response, err := validateUpdateRequest(pod, oldPod)
 			assert.Nil(t, response)
 
 			assertPodAdmissionErrorContains(t, err, pod, http.StatusForbidden,
-				"cannot update an existing pod's gMSA annotation (annotation %s changed)", nameKey)
+				"cannot update an existing pod's GMSA settings (GMSA name modified on %s %q)",
+				resourceKind, resourceName)
 		},
 
-		"if a contents annotation has changed, it fails": func(t *testing.T, pod *corev1.Pod, nameKey, contentsKey string) {
-			pod.Annotations[nameKey] = dummyCredSpecName
-			pod.Annotations[contentsKey] = "new-cred-spec-contents"
+		"if there was a change to a GMSA contents, it fails": func(t *testing.T, pod *corev1.Pod, optionsSelector winOptionsSelector, resourceKind gmsaResourceKind, resourceName string) {
+			setWindowsOptions(optionsSelector(pod), dummyCredSpecName, "new-cred-spec-contents")
 
 			oldPod := pod.DeepCopy()
-			oldPod.Annotations[contentsKey] = dummyCredSpecContents
+			setWindowsOptions(optionsSelector(oldPod), "", dummyCredSpecContents)
 
 			response, err := validateUpdateRequest(pod, oldPod)
 			assert.Nil(t, response)
 
 			assertPodAdmissionErrorContains(t, err, pod, http.StatusForbidden,
-				"cannot update an existing pod's gMSA annotation (annotation %s changed)", contentsKey)
+				"cannot update an existing pod's GMSA settings (GMSA contents modified on %s %q)",
+				resourceKind, resourceName)
+		},
+
+		"if there were changes to both GMSA name & contents, it fails": func(t *testing.T, pod *corev1.Pod, optionsSelector winOptionsSelector, resourceKind gmsaResourceKind, resourceName string) {
+			setWindowsOptions(optionsSelector(pod), "new-cred-spec-name", "new-cred-spec-contents")
+
+			oldPod := pod.DeepCopy()
+			setWindowsOptions(optionsSelector(oldPod), dummyCredSpecName, dummyCredSpecContents)
+
+			response, err := validateUpdateRequest(pod, oldPod)
+			assert.Nil(t, response)
+
+			assertPodAdmissionErrorContains(t, err, pod, http.StatusForbidden,
+				"cannot update an existing pod's GMSA settings (GMSA name and contents modified on %s %q)",
+				resourceKind, resourceName)
 		},
 	})
 }
 
-func TestJsonPatchEscape(t *testing.T) {
-	assert.Equal(t, "foobar", jsonPatchEscape("foobar"))
-	assert.Equal(t, "f~0~0oob~0ar", jsonPatchEscape("f~~oob~ar"))
-	assert.Equal(t, "foo~1bar~1~1", jsonPatchEscape("foo/bar//"))
-	assert.Equal(t, "~0fo~0~1o~1~0ba~1~1~0~0r~1", jsonPatchEscape("~fo~/o/~ba//~~r/"))
+func TestEqualStringPointers(t *testing.T) {
+	ptrToString := func(s *string) string {
+		if s == nil {
+			return "nil"
+		}
+		return " = " + *s
+	}
+
+	foo := "foo"
+	bar := "bar"
+
+	for _, testCase := range []struct {
+		s1             *string
+		s2             *string
+		expectedResult bool
+	}{
+		{
+			s1:             nil,
+			s2:             nil,
+			expectedResult: true,
+		},
+		{
+			s1:             &foo,
+			s2:             nil,
+			expectedResult: false,
+		},
+		{
+			s1:             &foo,
+			s2:             &foo,
+			expectedResult: true,
+		},
+		{
+			s1:             &foo,
+			s2:             &bar,
+			expectedResult: false,
+		},
+	} {
+		for _, ptrs := range [][]*string{
+			{testCase.s1, testCase.s2},
+			{testCase.s2, testCase.s1},
+		} {
+			s1 := ptrs[0]
+			s2 := ptrs[1]
+
+			testName := fmt.Sprintf("with s1 %s and s2 %s, should return %v",
+				ptrToString(s1),
+				ptrToString(s2),
+				testCase.expectedResult)
+
+			t.Run(testName, func(t *testing.T) {
+				assert.Equal(t, testCase.expectedResult, equalStringPointers(s1, s2))
+			})
+		}
+	}
 }
 
 /* Helpers below */
 
-type annotationsFactory func(containerName string) map[string]string
+type containerWindowsOptionsFactory func(containerName string) *corev1.WindowsSecurityContextOptions
+
+type winOptionsSelector func(pod *corev1.Pod) *corev1.WindowsSecurityContextOptions
 
 // a webhookValidateOrMutateTest function should run a test on one of the webhook's validate or mutate
-// functions, given the pair of labels it can play with.
+// functions, given a selector to extract the WindowsSecurityOptions struct it can play with from the pod.
 // It should assume that the pod it receives has any number of extra containers with correct
-// (in the sense of the test) annotations generated by a relevant annotationsFactory
-type webhookValidateOrMutateTest func(t *testing.T, pod *corev1.Pod, nameKey, contentsKey string)
+// (in the sense of the test) windows security options generated by a relevant containerWindowsOptionsFactory.
+type webhookValidateOrMutateTest func(t *testing.T, pod *corev1.Pod, optionsSelector winOptionsSelector, resourceKind gmsaResourceKind, resourceName string)
 
-// runWebhookValidateOrMutateTests runs the given tests with 0 to 5 extra containers with correct tags
-// as generated by the given annotationsFactory
-func runWebhookValidateOrMutateTests(t *testing.T, annotationsFactory annotationsFactory, tests map[string]webhookValidateOrMutateTest) {
+// runWebhookValidateOrMutateTests runs the given tests with 0 to 5 extra containers with correct windows
+// security options as generated by winOptionsFactory.
+func runWebhookValidateOrMutateTests(t *testing.T, winOptionsFactory containerWindowsOptionsFactory, tests map[string]webhookValidateOrMutateTest) {
 	for extraContainersCount := 0; extraContainersCount <= 5; extraContainersCount++ {
-		containersNames := make([]string, extraContainersCount+1)
-		containersNames[extraContainersCount] = dummyContainerName
-		extraAnnotations := make(map[string]string)
+		containerNamesAndWindowsOptions := make(map[string]*corev1.WindowsSecurityContextOptions)
 
 		for i := 0; i < extraContainersCount; i++ {
-			containersNames[i] = extraContainerName(i)
-			for k, v := range annotationsFactory(containersNames[i]) {
-				extraAnnotations[k] = v
-			}
+			containerName := extraContainerName(i)
+			containerNamesAndWindowsOptions[containerName] = winOptionsFactory(containerName)
 		}
 
 		testNameSuffix := ""
@@ -395,20 +496,46 @@ func runWebhookValidateOrMutateTests(t *testing.T, annotationsFactory annotation
 			testNameSuffix = fmt.Sprintf(" and %d extra containers", extraContainersCount)
 		}
 
-		for annotationLevel, annotationPrefix := range map[string]string{
-			"pod-level":       "pod",
-			"container-level": dummyContainerName + ".container",
-		} {
-			nameKey := annotationPrefix + ".alpha.windows.kubernetes.io/gmsa-credential-spec-name"
-			contentsKey := annotationPrefix + ".alpha.windows.kubernetes.io/gmsa-credential-spec"
-
+		for _, resourceKind := range []gmsaResourceKind{podKind, containerKind} {
 			for testName, testFunc := range tests {
-				shuffle(containersNames)
+				podWindowsOptions := &corev1.WindowsSecurityContextOptions{}
+				containerNamesAndWindowsOptions[dummyContainerName] = &corev1.WindowsSecurityContextOptions{}
+				pod := buildPod(dummyServiceAccoutName, podWindowsOptions, containerNamesAndWindowsOptions)
 
-				pod := buildPod(extraAnnotations, dummyServiceAccoutName, containersNames...)
+				var optionsSelector winOptionsSelector
+				var resourceName string
+				switch resourceKind {
+				case podKind:
+					optionsSelector = func(pod *corev1.Pod) *corev1.WindowsSecurityContextOptions {
+						if pod != nil && pod.Spec.SecurityContext != nil {
+							return pod.Spec.SecurityContext.WindowsOptions
+						}
+						return nil
+					}
 
-				t.Run(fmt.Sprintf("%s - with %s annotations%s", testName, annotationLevel, testNameSuffix), func(t *testing.T) {
-					testFunc(t, pod, nameKey, contentsKey)
+					resourceName = dummyPodName
+				case containerKind:
+					optionsSelector = func(pod *corev1.Pod) *corev1.WindowsSecurityContextOptions {
+						if pod != nil {
+							for _, container := range pod.Spec.Containers {
+								if container.Name == dummyContainerName {
+									if container.SecurityContext != nil {
+										return container.SecurityContext.WindowsOptions
+									}
+									return nil
+								}
+							}
+						}
+						return nil
+					}
+
+					resourceName = dummyContainerName
+				default:
+					t.Fatalf("Unknown resource kind: %q", resourceKind)
+				}
+
+				t.Run(fmt.Sprintf("%s - with %s-level windows options%s", testName, resourceKind, testNameSuffix), func(t *testing.T) {
+					testFunc(t, pod, optionsSelector, resourceKind, resourceName)
 				})
 			}
 		}
@@ -427,14 +554,4 @@ func assertPodAdmissionErrorContains(t *testing.T, err *podAdmissionError, pod *
 	result := assert.Equal(t, pod, err.pod)
 	result = assert.Equal(t, httpCode, err.code) && result
 	return assert.Contains(t, err.Error(), fmt.Sprintf(msgFormat, msgArgs...)) && result
-}
-
-func shuffle(a []string) {
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	for i := len(a) - 1; i > 0; i-- {
-		j := r.Int() % (i + 1)
-		tmp := a[j]
-		a[j] = a[i]
-		a[i] = tmp
-	}
 }

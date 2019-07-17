@@ -1,9 +1,9 @@
-# K8S version can be overrident
-KUBERNETES_VERSION ?= 1.13
-# see https://github.com/kubernetes-sigs/kubeadm-dind-cluster/releases
-KUBEADM_DIND_VERSION = v0.1.0
+# K8S version can be overriden
+KUBERNETES_VERSION ?= 1.15
+# see https://github.com/wk8/kubeadm-dind-cluster/releases
+KUBEADM_DIND_VERSION = v0.3.0
 
-ifeq ($(filter $(KUBERNETES_VERSION),1.11 1.12 1.13),)
+ifeq ($(filter $(KUBERNETES_VERSION),1.15),)
 $(error "Kubernetes version $(KUBERNETES_VERSION) not supported")
 endif
 
@@ -11,8 +11,10 @@ DEPLOYMENT_NAME ?= windows-gmsa-dev
 NAMESPACE ?= windows-gmsa-dev
 
 # kubeadm DinD settings
+# FIXME: switch to KIND, see
+# https://github.com/kubernetes-sigs/windows-gmsa/issues/12
 KUBEADM_DIND_CLUSTER_SCRIPT = dev/kubeadm_dind_scripts/$(KUBEADM_DIND_VERSION)/dind-cluster-v$(KUBERNETES_VERSION).sh
-KUBEADM_DIND_CLUSTER_SCRIPT_URL = https://github.com/kubernetes-sigs/kubeadm-dind-cluster/releases/download/$(KUBEADM_DIND_VERSION)/dind-cluster-v$(KUBERNETES_VERSION).sh
+KUBEADM_DIND_CLUSTER_SCRIPT_URL = https://github.com/wk8/kubeadm-dind-cluster/releases/download/$(KUBEADM_DIND_VERSION)/dind-cluster-v$(KUBERNETES_VERSION).sh
 KUBEADM_DIND_DIR = ~/.kubeadm-dind-cluster
 ADMISSION_PLUGINS = NodeRestriction,MutatingAdmissionWebhook,ValidatingAdmissionWebhook
 
@@ -20,10 +22,10 @@ KUBECTL = $(KUBEADM_DIND_DIR)/kubectl
 CERTS_DIR = dev/certs_dir
 MANIFESTS_FILE = dev/gmsa-webhook.yml
 
-# starts a new DinD cluster (see https://github.com/kubernetes-sigs/kubeadm-dind-cluster)
+# starts a new DinD cluster (see https://github.com/wk8/kubeadm-dind-cluster)
 .PHONY: cluster_start
 cluster_start: $(KUBEADM_DIND_CLUSTER_SCRIPT)
-	NUM_NODES=1 APISERVER_enable_admission_plugins=$(ADMISSION_PLUGINS) $(KUBEADM_DIND_CLUSTER_SCRIPT) up
+	NUM_NODES=1 SKIP_DASHBOARD=1 FEATURE_GATES='WindowsGMSA=true' APISERVER_enable_admission_plugins=$(ADMISSION_PLUGINS) $(KUBEADM_DIND_CLUSTER_SCRIPT) up
 	@ echo "### Kubectl version: ###"
 	$(KUBECTL) version
 

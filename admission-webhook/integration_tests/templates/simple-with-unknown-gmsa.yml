@@ -1,4 +1,4 @@
-## a simple deployment with a pod-level GMSA annotation referring a cred spec that doesn't exist
+## a simple deployment trying to use a pod-level GMSA cred spec that doesn't exist
 
 apiVersion: apps/v1beta1
 kind: Deployment
@@ -16,12 +16,11 @@ spec:
     metadata:
       labels:
         app: {{ .TestName }}
-      annotations:
-        pod.alpha.windows.kubernetes.io/gmsa-credential-spec-name: i-sure-dont-exist
     spec:
       serviceAccountName: {{ .ServiceAccountName }}
+      securityContext:
+        windowsOptions:
+          gmsaCredentialSpecName: i-sure-dont-exist
       containers:
-      - image: nginx
+      - image: k8s.gcr.io/pause
         name: nginx
-        ports:
-        - containerPort: 80
