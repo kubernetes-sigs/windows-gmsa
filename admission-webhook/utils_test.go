@@ -1,6 +1,9 @@
 package main
 
 import (
+	"math/rand"
+	"time"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -10,6 +13,7 @@ const dummyCredSpecName = "dummy-cred-spec-name"
 const dummyCredSpecContents = `{"We don't need no": ["education", "thought control", "dark sarcasm in the classroom"], "All in all you're just another": {"brick": "in", "the": "wall"}}`
 const dummyServiceAccoutName = "dummy-service-account-name"
 const dummyNamespace = "dummy-namespace"
+const dummyPodName = "dummy-pod-name"
 const dummyContainerName = "dummy-container-name"
 
 type dummyKubeClient struct {
@@ -33,24 +37,57 @@ func (dkc *dummyKubeClient) retrieveCredSpecContents(credSpecName string) (conte
 	return
 }
 
-func buildPod(annotations map[string]string, serviceAccountName string, containerNames ...string) *corev1.Pod {
-	containers := make([]corev1.Container, len(containerNames))
-	for i, name := range containerNames {
+func buildWindowsOptions(credSpecName, credSpecContents string) *corev1.WindowsSecurityContextOptions {
+	winOptions := &corev1.WindowsSecurityContextOptions{}
+	setWindowsOptions(winOptions, credSpecName, credSpecContents)
+	return winOptions
+}
+
+func setWindowsOptions(winOptions *corev1.WindowsSecurityContextOptions, credSpecName, credSpecContents string) {
+	if credSpecName != "" {
+		winOptions.GMSACredentialSpecName = &credSpecName
+	}
+	if credSpecContents != "" {
+		winOptions.GMSACredentialSpec = &credSpecContents
+	}
+}
+
+// buildPod builds a pod for unit tests.
+// `podWindowsOptions` should be either a full `*corev1.WindowsSecurityContextOptions` or a string, in which
+// case a `*corev1.WindowsSecurityContextOptions` is built using that string as the name of the cred spec to use.
+// Same goes for the values of `containerNamesAndWindowsOptions`.
+func buildPod(serviceAccountName string, podWindowsOptions *corev1.WindowsSecurityContextOptions, containerNamesAndWindowsOptions map[string]*corev1.WindowsSecurityContextOptions) *corev1.Pod {
+	containers := make([]corev1.Container, len(containerNamesAndWindowsOptions))
+	i := 0
+	for name, winOptions := range containerNamesAndWindowsOptions {
 		containers[i] = corev1.Container{Name: name}
+		if winOptions != nil {
+			containers[i].SecurityContext = &corev1.SecurityContext{WindowsOptions: winOptions}
+		}
+		i++
 	}
 
-	annotationsCopy := make(map[string]string)
-	for k, v := range annotations {
-		annotationsCopy[k] = v
+	shuffleContainers(containers)
+	podSpec := corev1.PodSpec{
+		ServiceAccountName: serviceAccountName,
+		Containers:         containers,
+	}
+	if podWindowsOptions != nil {
+		podSpec.SecurityContext = &corev1.PodSecurityContext{WindowsOptions: podWindowsOptions}
 	}
 
 	return &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Annotations: annotationsCopy,
-		},
-		Spec: corev1.PodSpec{
-			ServiceAccountName: serviceAccountName,
-			Containers:         containers,
-		},
+		ObjectMeta: metav1.ObjectMeta{Name: dummyPodName},
+		Spec:       podSpec,
+	}
+}
+
+func shuffleContainers(a []corev1.Container) {
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	for i := len(a) - 1; i > 0; i-- {
+		j := r.Int() % (i + 1)
+		tmp := a[j]
+		a[j] = a[i]
+		a[i] = tmp
 	}
 }

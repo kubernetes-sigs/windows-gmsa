@@ -19,40 +19,26 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
+type webhookOperation string
+
+//
+type gmsaResourceKind string
+
 const (
-	// gMSAContainerSpecContentsAnnotationKeySuffix is the suffix of the pod annotation where we store
-	// the contents of the GMSA credential spec for a given container (the full annotation being
-	// the container's name with this suffix appended).
-	gMSAContainerSpecContentsAnnotationKeySuffix = ".container.alpha.windows.kubernetes.io/gmsa-credential-spec"
-	// gMSAPodSpecContentsAnnotationKey is the pod annotation where we store the contents of the GMSA
-	// credential spec to use for containers that do not have their own specific GMSA cred spec set via a
-	// gMSAContainerSpecContentsAnnotationKeySuffix annotation as explained above
-	gMSAPodSpecContentsAnnotationKey = "pod.alpha.windows.kubernetes.io/gmsa-credential-spec"
-
-	// gMSAContainerSpecNameAnnotationKeySuffix is the suffix of the pod annotation used
-	// to give the name of the GMSA credential spec for a given container (the full annotation
-	// being the container's name with this suffix appended).
-	gMSAContainerSpecNameAnnotationKeySuffix = gMSAContainerSpecContentsAnnotationKeySuffix + "-name"
-	// gMSAPodSpecNameAnnotationKey is the pod annotation used to give the name of the GMSA
-	// credential spec for containers that do not have their own specific GMSA cred spec name
-	// set via a gMSAContainerSpecNameAnnotationKeySuffix annotation as explained above
-	gMSAPodSpecNameAnnotationKey = gMSAPodSpecContentsAnnotationKey + "-name"
-
 	contentTypeHeader = "Content-Type"
 	jsonContentType   = "application/json"
+
+	validate webhookOperation = "VALIDATE"
+	mutate   webhookOperation = "MUTATE"
+
+	podKind       gmsaResourceKind = "pod"
+	containerKind gmsaResourceKind = "container"
 )
 
 type webhook struct {
 	server *http.Server
 	client kubeClientInterface
 }
-
-type webhookOperation string
-
-const (
-	validate webhookOperation = "VALIDATE"
-	mutate   webhookOperation = "MUTATE"
-)
 
 type podAdmissionError struct {
 	error
@@ -255,50 +241,41 @@ func unmarshallPod(object runtime.RawExtension) (*corev1.Pod, *podAdmissionError
 	return pod, nil
 }
 
-// validateCreateRequest ensures that the GMSA contents annotations set on the pod
-// match the corresponding GMSA name annotations, and that the pod's service account
+// validateCreateRequest ensures that the GMSA contents set in the pod's spec
+// match the corresponding GMSA names, and that the pod's service account
 // is authorized to `use` the requested GMSA's.
 func (webhook *webhook) validateCreateRequest(pod *corev1.Pod, namespace string) (*admissionv1beta1.AdmissionResponse, *podAdmissionError) {
-	var err *podAdmissionError
-
-	iterateOverGMSAAnnotationPairs(pod, func(nameKey, contentsKey string) {
-		if err != nil {
-			return
-		}
-
-		if credSpecName, present := pod.Annotations[nameKey]; present && credSpecName != "" {
+	if err := iterateOverWindowsSecurityOptions(pod, func(windowsOptions *corev1.WindowsSecurityContextOptions, resourceKind gmsaResourceKind, resourceName string, _ int) *podAdmissionError {
+		if credSpecName := windowsOptions.GMSACredentialSpecName; credSpecName != nil {
 			// let's check that the associated service account can read the relevant cred spec CRD
-			if authorized, reason := webhook.client.isAuthorizedToUseCredSpec(pod.Spec.ServiceAccountName, namespace, credSpecName); !authorized {
-				msg := fmt.Sprintf("service account %s is not authorized `use` gMSA cred spec %s", pod.Spec.ServiceAccountName, credSpecName)
+			if authorized, reason := webhook.client.isAuthorizedToUseCredSpec(pod.Spec.ServiceAccountName, namespace, *credSpecName); !authorized {
+				msg := fmt.Sprintf("service account %q is not authorized to `use` GMSA cred spec %q", pod.Spec.ServiceAccountName, *credSpecName)
 				if reason != "" {
 					msg += fmt.Sprintf(", reason: %q", reason)
 				}
-				err = &podAdmissionError{error: fmt.Errorf(msg), pod: pod, code: http.StatusForbidden}
-				return
+				return &podAdmissionError{error: fmt.Errorf(msg), pod: pod, code: http.StatusForbidden}
 			}
 
-			// and the contents annotation should contain the expected cred spec
-			if credSpecContents, present := pod.Annotations[contentsKey]; present {
-				if expectedContents, code, retrieveErr := webhook.client.retrieveCredSpecContents(credSpecName); retrieveErr != nil {
-					err = &podAdmissionError{error: retrieveErr, pod: pod, code: code}
-					return
-				} else if specsEqual, compareErr := compareCredSpecContents(credSpecContents, expectedContents); !specsEqual || compareErr != nil {
-					msg := fmt.Sprintf("cred spec contained in annotation %q does not match the contents of GMSA %q", contentsKey, credSpecName)
+			// and the contents should match the ones contained in the GMSA resource with that name
+			if credSpecContents := windowsOptions.GMSACredentialSpec; credSpecContents != nil {
+				if expectedContents, code, retrieveErr := webhook.client.retrieveCredSpecContents(*credSpecName); retrieveErr != nil {
+					return &podAdmissionError{error: retrieveErr, pod: pod, code: code}
+				} else if specsEqual, compareErr := compareCredSpecContents(*credSpecContents, expectedContents); !specsEqual || compareErr != nil {
+					msg := fmt.Sprintf("the GMSA cred spec contents for %s %q does not match the contents of GMSA resource %q", resourceKind, resourceName, *credSpecName)
 					if compareErr != nil {
 						msg += fmt.Sprintf(": %v", compareErr)
 					}
-					err = &podAdmissionError{error: fmt.Errorf(msg), pod: pod, code: http.StatusUnprocessableEntity}
-					return
+					return &podAdmissionError{error: fmt.Errorf(msg), pod: pod, code: http.StatusUnprocessableEntity}
 				}
 			}
-		} else if _, present := pod.Annotations[contentsKey]; present {
-			// the name annotation is not present, but the contents one is
-			msg := fmt.Sprintf("cannot pre-set a pod's gMSA contents annotation (annotation %q present) without setting the corresponding name annotation %q", contentsKey, nameKey)
-			err = &podAdmissionError{error: fmt.Errorf(msg), pod: pod, code: http.StatusUnprocessableEntity}
-			return
+		} else if windowsOptions.GMSACredentialSpec != nil {
+			// the GMSA's name is not set, but the contents are
+			msg := fmt.Sprintf("%s %q has a GMSA cred spec set, but does not define the name of the corresponding resource", resourceKind, resourceName)
+			return &podAdmissionError{error: fmt.Errorf(msg), pod: pod, code: http.StatusUnprocessableEntity}
 		}
-	})
-	if err != nil {
+
+		return nil
+	}); err != nil {
 		return nil, err
 	}
 
@@ -306,62 +283,61 @@ func (webhook *webhook) validateCreateRequest(pod *corev1.Pod, namespace string)
 }
 
 // compareCredSpecContents returns true iff the two strings represent the same credential spec contents.
-func compareCredSpecContents(fromAnnotation, fromCRD string) (bool, error) {
-	// this is actually what happens almost all the time, when users don't set the contents annotation directly
+func compareCredSpecContents(fromResource, fromCRD string) (bool, error) {
+	// this is actually what happens almost all the time, when users don't set the GMSA contents directly
 	// but instead rely on the mutating webhook to do that for them; and in that case no need for a slow
 	// JSON parsing and comparison
-	if fromAnnotation == fromCRD {
+	if fromResource == fromCRD {
 		return true, nil
 	}
 
 	var (
-		jsonObjectFromAnnotation map[string]interface{}
-		jsonObjectFromCRD        map[string]interface{}
+		jsonObjectFromResource map[string]interface{}
+		jsonObjectFromCRD      map[string]interface{}
 	)
 
-	if err := json.Unmarshal([]byte(fromAnnotation), &jsonObjectFromAnnotation); err != nil {
-		return false, fmt.Errorf("unable to parse annotation %q as a JSON object: %v", fromAnnotation, err)
+	if err := json.Unmarshal([]byte(fromResource), &jsonObjectFromResource); err != nil {
+		return false, fmt.Errorf("unable to parse %q as a JSON object: %v", fromResource, err)
 	}
 	if err := json.Unmarshal([]byte(fromCRD), &jsonObjectFromCRD); err != nil {
 		return false, fmt.Errorf("unable to parse CRD %q as a JSON object: %v", fromCRD, err)
 	}
 
-	return reflect.DeepEqual(jsonObjectFromAnnotation, jsonObjectFromCRD), nil
+	return reflect.DeepEqual(jsonObjectFromResource, jsonObjectFromCRD), nil
 }
 
-// mutateCreateRequest inlines the requested GMSA's into the pod's spec as annotations.
+// mutateCreateRequest inlines the requested GMSA's into the pod's and containers' `WindowsSecurityOptions` structs.
 func (webhook *webhook) mutateCreateRequest(pod *corev1.Pod) (*admissionv1beta1.AdmissionResponse, *podAdmissionError) {
-	var (
-		patches []map[string]string
-		err     *podAdmissionError
-	)
+	var patches []map[string]string
 
-	iterateOverGMSAAnnotationPairs(pod, func(nameKey, contentsKey string) {
-		if err != nil {
-			return
-		}
-
-		if credSpecName, present := pod.Annotations[nameKey]; present && credSpecName != "" {
-			// if the user has pre-set the contents annotation, we won't override it - it'll be down
+	if err := iterateOverWindowsSecurityOptions(pod, func(windowsOptions *corev1.WindowsSecurityContextOptions, resourceKind gmsaResourceKind, resourceName string, containerIndex int) *podAdmissionError {
+		if credSpecName := windowsOptions.GMSACredentialSpecName; credSpecName != nil {
+			// if the user has pre-set the GMSA's contents, we won't override it - it'll be down
 			// to the validation endpoint to make sure the contents actually are what they should
-			if _, present = pod.Annotations[contentsKey]; !present {
-				contents, code, retrieveErr := webhook.client.retrieveCredSpecContents(credSpecName)
+			if credSpecContents := windowsOptions.GMSACredentialSpec; credSpecContents == nil {
+				contents, code, retrieveErr := webhook.client.retrieveCredSpecContents(*credSpecName)
 				if retrieveErr != nil {
-					err = &podAdmissionError{error: retrieveErr, pod: pod, code: code}
-					return
+					return &podAdmissionError{error: retrieveErr, pod: pod, code: code}
+				}
+
+				partialPath := ""
+				if resourceKind == containerKind {
+					partialPath = fmt.Sprintf("/containers/%d", containerIndex)
 				}
 
 				// worth noting that this JSON patch is guaranteed to work since we know at this point
-				// that the pod has annotations, and and that it doesn't have this specific one
+				// that the resource comprises a `windowsOptions` object, and and that it doesn't have a
+				// "gmsaCredentialSpec" field
 				patches = append(patches, map[string]string{
 					"op":    "add",
-					"path":  fmt.Sprintf("/metadata/annotations/%s", jsonPatchEscape(contentsKey)),
+					"path":  fmt.Sprintf("/spec%s/securityContext/windowsOptions/gmsaCredentialSpec", partialPath),
 					"value": contents,
 				})
 			}
 		}
-	})
-	if err != nil {
+
+		return nil
+	}); err != nil {
 		return nil, err
 	}
 
@@ -381,56 +357,89 @@ func (webhook *webhook) mutateCreateRequest(pod *corev1.Pod) (*admissionv1beta1.
 	return admissionResponse, nil
 }
 
-// see jsonPatchEscape below
-var jsonPatchEscaper = strings.NewReplacer("~", "~0", "/", "~1")
-
-// jsonPatchEscape complies with JSON Patch's way of escaping special characters
-// in key names. See https://tools.ietf.org/html/rfc6901#section-3
-func jsonPatchEscape(s string) string {
-	return jsonPatchEscaper.Replace(s)
-}
-
-// validateUpdateRequest ensures that there are no updates to any of the GMSA annotations.
+// validateUpdateRequest ensures that there are no updates to any of the GMSA names or contents.
 func validateUpdateRequest(pod, oldPod *corev1.Pod) (*admissionv1beta1.AdmissionResponse, *podAdmissionError) {
-	var err *podAdmissionError
+	var oldPodContainerOptions map[string]*corev1.WindowsSecurityContextOptions
 
-	iterateOverGMSAAnnotationPairs(pod, func(nameKey, contentsKey string) {
-		if err != nil {
-			return
+	if err := iterateOverWindowsSecurityOptions(pod, func(windowsOptions *corev1.WindowsSecurityContextOptions, resourceKind gmsaResourceKind, resourceName string, _ int) *podAdmissionError {
+		var oldWindowsOptions *corev1.WindowsSecurityContextOptions
+		if resourceKind == podKind {
+			if oldPod.Spec.SecurityContext != nil {
+				oldWindowsOptions = oldPod.Spec.SecurityContext.WindowsOptions
+			}
+		} else {
+			// it's a container; look for the same container in the old pod,
+			// lazily building the map of container names to security options if needed
+			if oldPodContainerOptions == nil {
+				oldPodContainerOptions = make(map[string]*corev1.WindowsSecurityContextOptions)
+				iterateOverWindowsSecurityOptions(oldPod, func(winOpts *corev1.WindowsSecurityContextOptions, rsrcKind gmsaResourceKind, rsrcName string, _ int) *podAdmissionError {
+					if rsrcKind == containerKind {
+						oldPodContainerOptions[rsrcName] = winOpts
+					}
+					return nil
+				})
+			}
+
+			oldWindowsOptions = oldPodContainerOptions[resourceName]
 		}
-		if err = assertAnnotationsUnchanged(pod, oldPod, nameKey); err != nil {
-			return
+
+		if oldWindowsOptions == nil {
+			oldWindowsOptions = &corev1.WindowsSecurityContextOptions{}
 		}
-		if err = assertAnnotationsUnchanged(pod, oldPod, contentsKey); err != nil {
-			return
+
+		var modifiedFieldNames []string
+		if !equalStringPointers(windowsOptions.GMSACredentialSpecName, oldWindowsOptions.GMSACredentialSpecName) {
+			modifiedFieldNames = append(modifiedFieldNames, "name")
 		}
-	})
-	if err != nil {
+		if !equalStringPointers(windowsOptions.GMSACredentialSpec, oldWindowsOptions.GMSACredentialSpec) {
+			modifiedFieldNames = append(modifiedFieldNames, "contents")
+		}
+
+		if len(modifiedFieldNames) != 0 {
+			msg := fmt.Errorf("cannot update an existing pod's GMSA settings (GMSA %s modified on %s %q)", strings.Join(modifiedFieldNames, " and "), resourceKind, resourceName)
+			return &podAdmissionError{error: msg, pod: pod, code: http.StatusForbidden}
+		}
+
+		return nil
+	}); err != nil {
 		return nil, err
 	}
 
 	return &admissionv1beta1.AdmissionResponse{Allowed: true}, nil
 }
 
-// assertAnnotationsUnchanged returns an error if the two pods don't have the same annotation for the given key.
-func assertAnnotationsUnchanged(pod, oldPod *corev1.Pod, key string) *podAdmissionError {
-	if pod.Annotations[key] != oldPod.Annotations[key] {
-		return &podAdmissionError{
-			error: fmt.Errorf("cannot update an existing pod's gMSA annotation (annotation %v changed)", key),
-			pod:   pod,
-			code:  http.StatusForbidden,
-		}
+func equalStringPointers(s1, s2 *string) bool {
+	if s1 == nil {
+		return s2 == nil
 	}
-	return nil
+	if s2 == nil {
+		return false
+	}
+	return *s1 == *s2
 }
 
-// iterateOverGMSAAnnotationPairs calls `f` on the successive pairs of GMSA name and contents
-// annotation keys.
-func iterateOverGMSAAnnotationPairs(pod *corev1.Pod, f func(nameKey, contentsKey string)) {
-	f(gMSAPodSpecNameAnnotationKey, gMSAPodSpecContentsAnnotationKey)
-	for _, container := range pod.Spec.Containers {
-		f(container.Name+gMSAContainerSpecNameAnnotationKeySuffix, container.Name+gMSAContainerSpecContentsAnnotationKeySuffix)
+// iterateOverWindowsSecurityOptions calls `f` on the pod's `.Spec.SecurityContext.WindowsOptions` field,
+// as well as over each of its container's `.SecurityContext.WindowsOptions` field.
+// `f` can assume it only gets called with non-nil `WindowsSecurityOptions` pointers; the other
+// arguments give information on the resource owning that pointer - in particular, if that
+// resource is a container, `containerIndex` is the index of the container in the spec's list (-1 for pods).
+// If `f` returns an error, that breaks the loop, and the error is bubbled up.
+func iterateOverWindowsSecurityOptions(pod *corev1.Pod, f func(windowsOptions *corev1.WindowsSecurityContextOptions, resourceKind gmsaResourceKind, resourceName string, containerIndex int) *podAdmissionError) *podAdmissionError {
+	if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.WindowsOptions != nil {
+		if err := f(pod.Spec.SecurityContext.WindowsOptions, podKind, pod.Name, -1); err != nil {
+			return err
+		}
 	}
+
+	for i, container := range pod.Spec.Containers {
+		if container.SecurityContext != nil && container.SecurityContext.WindowsOptions != nil {
+			if err := f(container.SecurityContext.WindowsOptions, containerKind, container.Name, i); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
 
 // deniedAdmissionResponse is a helper function to create an AdmissionResponse

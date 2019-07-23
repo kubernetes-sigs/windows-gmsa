@@ -7,15 +7,16 @@ metadata:
     app: {{ .TestName }}
   name: {{ .TestName }}
   namespace: {{ .Namespace }}
-  annotations:
-    {{ .TestName }}.container.alpha.windows.kubernetes.io/gmsa-credential-spec-name: {{ index .CredSpecNames 0 }}
-{{- range $k, $v := .ExtraAnnotations }}
-    {{ $k }}: {{ $v }}
-{{- end }}
 spec:
   serviceAccountName: {{ .ServiceAccountName }}
   containers:
   - name: {{ .TestName }}
-    image: nginx
+    image: k8s.gcr.io/pause
+    securityContext:
+      windowsOptions:
+        gmsaCredentialSpecName: {{ index .CredSpecNames 0 }}
+{{- if .CredSpecContent }}
+        gmsaCredentialSpec: '{{ .CredSpecContent }}'
+{{- end }}
   dnsPolicy: ClusterFirst
   restartPolicy: Never
