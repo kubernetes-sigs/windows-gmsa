@@ -9,8 +9,8 @@ Param(
     [Parameter(Mandatory=$false)] $Domain,
     [Parameter(Mandatory=$false)] [string[]] $AdditionalAccounts = @()
 )
-# Uncomment below for logging
-#Start-Transcript -Path "C:\gmsa\CredSpec.txt"
+# Logging for troubleshooting
+Start-Transcript -Path "C:\gmsa\CredSpec.txt"
 # exit on error
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
