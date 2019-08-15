@@ -44,7 +44,7 @@ $dockerCredSpecName = "tmp-k8s-cred-spec" + -join ((48..57) + (97..122) | Get-Ra
 if (-not $Domain) {
     $Domain = Get-ADDomain
 }
-New-CredentialSpec -Name $dockerCredSpecName -AccountName $AccountName -Domain $Domain.DnsRoot -AdditionalAccounts $AdditionalAccounts > C:\gmsa\create-account.txt
+New-CredentialSpec -Name $dockerCredSpecName -AccountName $AccountName -Domain $Domain.DnsRoot -AdditionalAccounts $AdditionalAccounts
 
 # parse the JSON file thus generated
 $dockerCredSpecPath = (Get-CredentialSpec | Where-Object {$_.Name -like "$dockerCredSpecName*"}).Path
