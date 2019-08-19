@@ -28,6 +28,9 @@ cluster_start: $(KUBEADM_DIND_CLUSTER_SCRIPT)
 	NUM_NODES=1 SKIP_DASHBOARD=1 FEATURE_GATES='WindowsGMSA=true' APISERVER_enable_admission_plugins=$(ADMISSION_PLUGINS) $(KUBEADM_DIND_CLUSTER_SCRIPT) up
 	@ echo "### Kubectl version: ###"
 	$(KUBECTL) version
+	# known issue with kubeadm-dind
+	# TODO: remove this when we migrate to kind
+	$(KUBECTL) delete -n kube-system deployment.apps/coredns
 
 # stops the DinD cluster
 .PHONY: cluster_stop

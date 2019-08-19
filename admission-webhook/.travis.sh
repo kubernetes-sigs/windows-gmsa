@@ -69,6 +69,8 @@ run_integration_tests() {
 run_dry_run_deploy() {
     make cluster_start
 
+    wait_for_all_terminating_k8s_resources || return $?
+
     local SNAPSHOT_DIR='k8s_snapshot'
     k8s_snapshot $SNAPSHOT_DIR/before
 
@@ -86,20 +88,69 @@ k8s_snapshot() {
     [ "$DIR" ] && [ ! -d "$DIR" ] || return 1
     mkdir -p "$DIR"
 
-    local RESOURCE OUTPUT EXIT_STATUS
+    local RESOURCE OUTPUT
     for RESOURCE in $($KUBECTL api-resources -o name); do
-        EXIT_STATUS=0
-        # this output is guaranteed to be unique since namespaces can't contain spaces
-        OUTPUT="$($KUBECTL get "$RESOURCE" --all-namespaces -o jsonpath='{range .items[*]}{@.metadata.namespace}{" "}{@.metadata.name}{"\n"}{end}' 2>&1)" \
-            || EXIT_STATUS=$?
-
-        if [[ $EXIT_STATUS == 0 ]]; then
-            echo "$OUTPUT" | sort > "$DIR/$RESOURCE"
-        elif [[ "$OUTPUT" != *'(NotFound)'* ]] && [[ "$OUTPUT" != *'(MethodNotAllowed)'* ]]; then
-            echo "Error when listing k8s resource $RESOURCE: $OUTPUT"
-            return $EXIT_STATUS
-        fi
+        OUTPUT="$(list_k8s_resources "$RESOURCE")" || return $?
+        echo "$OUTPUT" | sort > "$DIR/$RESOURCE"
     done
+}
+
+# lists all API objects of the given resource, with an optional JSON-path filter
+list_k8s_resources() {
+    local RESOURCE="$1"
+
+    local FILTER
+    if [ "$2" ]; then
+        FILTER="?(@.$2)"
+    else
+        FILTER='*'
+    fi
+
+    local OUTPUT EXIT_STATUS=0
+
+    # this output is guaranteed to be unique since namespaces can't contain spaces
+    OUTPUT="$($KUBECTL get "$RESOURCE" --all-namespaces -o jsonpath="{range .items[$FILTER]}{@.metadata.namespace}{\" \"}{@.metadata.name}{\" \"}{@.status.phase}{\"\n\"}{end}" 2>&1)" \
+        || EXIT_STATUS=$?
+
+    if [[ $EXIT_STATUS == 0 ]]; then
+        echo "$OUTPUT"
+        return 0
+    elif [[ "$OUTPUT" == *'(NotFound)'* ]] || [[ "$OUTPUT" == *'(MethodNotAllowed)'* ]]; then
+        return 0
+    else
+        echo "Error when listing k8s resource $RESOURCE: $OUTPUT" 1>&2
+        return $EXIT_STATUS
+    fi
+}
+
+# waits for all API objects in "Terminating" state to go away, for up to
+# 60 secs per resource type
+wait_for_all_terminating_k8s_resources() {
+    local RESOURCE
+    for RESOURCE in $($KUBECTL api-resources -o name); do
+        wait_for_terminating_k8s_resources "$RESOURCE" || return $?
+    done
+}
+
+# waits up to 60 seconds for API objects of the given resource that are
+# in "Terminating" state to go away, else errors out
+wait_for_terminating_k8s_resources() {
+    local RESOURCE="$1"
+
+    local START="$(date -u +%s)" OUTPUT
+
+    while [ "$(( $(date -u +%s) - $START ))" -le 60 ]; do
+        OUTPUT="$(list_k8s_resources "$RESOURCE" 'status.phase=="Terminating"')" || return $?
+        if [ "$OUTPUT" ]; then
+            # there still are terminating resources
+            sleep 1
+            continue
+        fi
+        return 0
+    done
+
+    echo -e "Timed out waiting for all terminating $RESOURCE to go away:\n$OUTPUT"
+    return 1
 }
 
 main "$@"
