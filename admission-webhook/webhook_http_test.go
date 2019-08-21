@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	authenticationv1 "k8s.io/api/authentication/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -24,8 +25,7 @@ import (
 func TestHTTPWebhook(t *testing.T) {
 	var requestUID types.UID = "283f4877-34d4-11e9-a9f1-06da3a0adce4"
 
-	pod := buildPod(map[string]string{"pod.alpha.windows.kubernetes.io/gmsa-credential-spec-name": dummyCredSpecName},
-		dummyServiceAccoutName, "container-name")
+	pod := buildPod(dummyServiceAccoutName, buildWindowsOptions(dummyCredSpecName, ""), map[string]*corev1.WindowsSecurityContextOptions{"container-name": nil})
 
 	admissionRequest := &admissionv1beta1.AdmissionReview{
 		Request: &admissionv1beta1.AdmissionRequest{
@@ -89,7 +89,7 @@ func TestHTTPWebhook(t *testing.T) {
 		if err := json.Unmarshal(response.Response.Patch, &patches); assert.Nil(t, err) && assert.Equal(t, 1, len(patches)) {
 			expectedPatch := map[string]string{
 				"op":    "add",
-				"path":  "/metadata/annotations/pod.alpha.windows.kubernetes.io~1gmsa-credential-spec",
+				"path":  "/spec/securityContext/windowsOptions/gmsaCredentialSpec",
 				"value": dummyCredSpecContents,
 			}
 			assert.Equal(t, expectedPatch, patches[0])
@@ -114,7 +114,7 @@ func TestHTTPWebhook(t *testing.T) {
 
 		require.NotNil(t, response.Response.Result)
 		assert.Equal(t, int32(http.StatusForbidden), response.Response.Result.Code)
-		expectedSubstr := fmt.Sprintf("service account %s is not authorized `use` gMSA cred spec", dummyServiceAccoutName)
+		expectedSubstr := fmt.Sprintf("service account %q is not authorized to `use` GMSA cred spec", dummyServiceAccoutName)
 		assert.Contains(t, response.Response.Result.Message, expectedSubstr)
 	})
 

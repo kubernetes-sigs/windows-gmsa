@@ -1,4 +1,4 @@
-## a simple deployment with a container-level GMSA annotation
+## a simple deployment with a container-level GMSA cred spec
 
 apiVersion: apps/v1beta1
 kind: Deployment
@@ -16,12 +16,11 @@ spec:
     metadata:
       labels:
         app: {{ .TestName }}
-      annotations:
-        nginx.container.alpha.windows.kubernetes.io/gmsa-credential-spec-name: {{ index .CredSpecNames 0 }}
     spec:
       serviceAccountName: {{ .ServiceAccountName }}
       containers:
-      - image: nginx
+      - image: k8s.gcr.io/pause
         name: nginx
-        ports:
-        - containerPort: 80
+        securityContext:
+          windowsOptions:
+            gmsaCredentialSpecName: {{ index .CredSpecNames 0 }}

@@ -1,5 +1,9 @@
 # Windows GMSA Webhook Admission controller
 
+## Supported versions
+
+This branch supports versions 1.15 and later. If your Kubernetes is version 1.14, you can use the [alpha version of this webhook](https://github.com/kubernetes-sigs/windows-gmsa/tree/alpha-1.14).
+
 ## How to deploy
 
 Assuming that `kubectl` is in your path and that your cluster's kube admin config file is present at either the canonical location
