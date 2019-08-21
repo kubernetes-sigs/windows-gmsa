@@ -9,7 +9,8 @@ Param(
     [Parameter(Mandatory=$false)] $Domain,
     [Parameter(Mandatory=$false)] [string[]] $AdditionalAccounts = @()
 )
-
+# Logging for troubleshooting
+Start-Transcript -Path "C:\gmsa\CredSpec.txt"
 # exit on error
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -37,19 +38,19 @@ Invoke-WebRequest "https://raw.githubusercontent.com/Microsoft/Virtualization-Do
 Import-Module $env:temp\cred.psm1
 
 # generate a unique docker cred spec name
-$dockerCredSpecName = "tmp-k8s-cred-spec" + -join ((48..57) + (97..122) | Get-Random -Count 64 | % {[char]$_})
+$dockerCredSpecName = "tmp-k8s-cred-spec" + -join ((48..57) + (97..122) | Get-Random -Count 64 | ForEach-Object {[char]$_})
 
 # have the upstream function perform its magic
 if (-not $Domain) {
     $Domain = Get-ADDomain
 }
-New-CredentialSpec -Name $dockerCredSpecName -AccountName $AccountName -Domain $Domain -AdditionalAccounts $AdditionalAccounts
+New-CredentialSpec -Name $dockerCredSpecName -AccountName $AccountName -Domain $Domain.DnsRoot -AdditionalAccounts $AdditionalAccounts
 
 # parse the JSON file thus generated
-$dockerCredSpecPath = (Get-CredentialSpec | Where-Object {$_.Name  -eq $dockerCredSpecName}).Path
-$credSpecContents = cat $dockerCredSpecPath | ConvertFrom-Json
+$dockerCredSpecPath = (Get-CredentialSpec | Where-Object {$_.Name -like "$dockerCredSpecName*"}).Path
+$credSpecContents = Get-Content $dockerCredSpecPath | ConvertFrom-Json
 # and clean it up
-rm $dockerCredSpecPath
+Remove-Item $dockerCredSpecPath
 
 # generate the k8s resource
 $resource = [ordered]@{
@@ -63,4 +64,4 @@ $resource = [ordered]@{
 
 ConvertTo-Yaml $resource | Set-Content $ManifestFile
 
-echo "K8S manifest rendered at $ManifestFile"
+Write-Output "K8S manifest rendered at $ManifestFile"
