@@ -17,7 +17,7 @@ This script:
  * deploys a k8s service running the webhook
  * registers that service as a webhook admission controller
 
-usage: $0 --file MANIFESTS_FILE [--name NAME] [--namespace NAMESPACE] [--image IMAGE_NAME] [--certs-dir CERTS_DIR] [--dry-run] [--overwrite]
+usage: $0 --file MANIFESTS_FILE [--name NAME] [--namespace NAMESPACE] [--image IMAGE_NAME] [--certs-dir CERTS_DIR] [--dry-run] [--overwrite] [--tolerate-master]
 
 MANIFESTS_FILE is the path to the file the k8s manifests will be written to.
 NAME defaults to 'gmsa-webhook' and is used in the names of most of the k8s resources created.
@@ -29,6 +29,7 @@ If --dry-run is set, the script echoes what command it would perform
 without actually affecting the k8s cluster.
 If the files this script generates already exist and --overwrite is
 not set, it will not regenerate the files.
+If --tolerate-master is set, the webhook will tolerate running on master nodes.
 EOF
     exit 1
 }
@@ -66,6 +67,7 @@ main() {
     local CERTS_DIR='gmsa-webhook-certs'
     local DRY_RUN=false
     local OVERWRITE=false
+    local TOLERATE_MASTER=false
 
     # parse arguments
     while [[ $# -gt 0 ]]; do
@@ -84,6 +86,8 @@ main() {
                 DRY_RUN=true && shift ;;
             --overwrite)
                 OVERWRITE=true && shift ;;
+            --tolerate-master)
+                TOLERATE_MASTER=true && shift ;;
             *)
                 echo "Unknown option: $1"
                 usage ;;
@@ -137,6 +141,15 @@ main() {
         fatal_error "Expected to find the server certificate at $SERVER_CERT"
     fi
 
+    TOLERATIONS=''
+    if $TOLERATE_MASTER; then
+        TOLERATIONS='
+      tolerations:
+      - key: node-role.kubernetes.io/master
+        operator: Exists
+        effect: NoSchedule'
+    fi
+
     TLS_PRIVATE_KEY=$(cat "$SERVER_KEY" | base64 -w 0) \
         TLS_CERTIFICATE="$TLS_CERTIFICATE" \
         CA_BUNDLE="$($KUBECTL get configmap -n kube-system extension-apiserver-authentication -o=jsonpath='{.data.client-ca-file}' | base64 -w 0)" \
@@ -144,6 +157,7 @@ main() {
         NAME="$NAME" \
         NAMESPACE="$NAMESPACE" \
         IMAGE_NAME="$IMAGE_NAME" \
+        TOLERATIONS="$TOLERATIONS" \
         envsubst < "$TEMPLATE_PATH" > "$MANIFESTS_FILE"
 
     echo_or_run --with-kubectl-dry-run "$KUBECTL apply -f $MANIFESTS_FILE"

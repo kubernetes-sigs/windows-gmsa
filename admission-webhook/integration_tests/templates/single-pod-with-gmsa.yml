@@ -24,3 +24,6 @@ spec:
 {{- end }}
   dnsPolicy: ClusterFirst
   restartPolicy: Never
+{{- range $line := .ExtraSpecLines }}
+  {{ $line }}
+{{- end }}

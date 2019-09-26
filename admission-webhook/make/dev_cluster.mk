@@ -9,6 +9,7 @@ endif
 
 DEPLOYMENT_NAME ?= windows-gmsa-dev
 NAMESPACE ?= windows-gmsa-dev
+NUM_NODES ?= 1
 
 # kubeadm DinD settings
 # FIXME: switch to KIND, see
@@ -25,12 +26,14 @@ MANIFESTS_FILE = dev/gmsa-webhook.yml
 # starts a new DinD cluster (see https://github.com/wk8/kubeadm-dind-cluster)
 .PHONY: cluster_start
 cluster_start: $(KUBEADM_DIND_CLUSTER_SCRIPT)
-	NUM_NODES=1 SKIP_DASHBOARD=1 FEATURE_GATES='WindowsGMSA=true' APISERVER_enable_admission_plugins=$(ADMISSION_PLUGINS) $(KUBEADM_DIND_CLUSTER_SCRIPT) up
+	NUM_NODES=$(NUM_NODES) SKIP_DASHBOARD=1 FEATURE_GATES='WindowsGMSA=true' APISERVER_enable_admission_plugins=$(ADMISSION_PLUGINS) $(KUBEADM_DIND_CLUSTER_SCRIPT) up
 	@ echo "### Kubectl version: ###"
 	$(KUBECTL) version
 	# known issue with kubeadm-dind
 	# TODO: remove this when we migrate to kind
 	$(KUBECTL) delete -n kube-system deployment.apps/coredns
+	# also, kubeadm-dind removes the taint on master when NUM_NODES is 0 - but we do want to test that case too!
+	$(KUBECTL) taint node kube-master 'node-role.kubernetes.io/master=true:NoSchedule' --overwrite
 
 # stops the DinD cluster
 .PHONY: cluster_stop
@@ -103,10 +106,10 @@ ifeq ($(K8S_GMSA_DEPLOY_METHOD),download)
         [ "$$K8S_GMSA_DEPLOY_DOWNLOAD_REPO" ] || K8S_GMSA_DEPLOY_DOWNLOAD_REPO='kubernetes-sigs/windows-gmsa'; \
       fi \
       && if [ ! "$$K8S_GMSA_DEPLOY_DOWNLOAD_REV" ]; then K8S_GMSA_DEPLOY_DOWNLOAD_REV="$$(git rev-parse HEAD)"; fi \
-      && CMD="curl -sL 'https://raw.githubusercontent.com/$$K8S_GMSA_DEPLOY_DOWNLOAD_REPO/$$K8S_GMSA_DEPLOY_DOWNLOAD_REV/admission-webhook/deploy/deploy-gmsa-webhook.sh' | K8S_GMSA_DEPLOY_DOWNLOAD_REPO='$$K8S_GMSA_DEPLOY_DOWNLOAD_REPO' K8S_GMSA_DEPLOY_DOWNLOAD_REV='$$K8S_GMSA_DEPLOY_DOWNLOAD_REV' KUBECTL=$(KUBECTL) bash -s -- --file '$(MANIFESTS_FILE)' --name '$(DEPLOYMENT_NAME)' --namespace '$(NAMESPACE)' --image '$(K8S_GMSA_IMAGE)' --certs-dir '$(CERTS_DIR)'" \
+      && CMD="curl -sL 'https://raw.githubusercontent.com/$$K8S_GMSA_DEPLOY_DOWNLOAD_REPO/$$K8S_GMSA_DEPLOY_DOWNLOAD_REV/admission-webhook/deploy/deploy-gmsa-webhook.sh' | K8S_GMSA_DEPLOY_DOWNLOAD_REPO='$$K8S_GMSA_DEPLOY_DOWNLOAD_REPO' K8S_GMSA_DEPLOY_DOWNLOAD_REV='$$K8S_GMSA_DEPLOY_DOWNLOAD_REV' KUBECTL=$(KUBECTL) bash -s -- --file '$(MANIFESTS_FILE)' --name '$(DEPLOYMENT_NAME)' --namespace '$(NAMESPACE)' --image '$(K8S_GMSA_IMAGE)' --certs-dir '$(CERTS_DIR)' $(EXTRA_GMSA_DEPLOY_ARGS)" \
       && echo "$$CMD" && eval "$$CMD"
 else
-	KUBECTL=$(KUBECTL) ./deploy/deploy-gmsa-webhook.sh --file "$(MANIFESTS_FILE)" --name "$(DEPLOYMENT_NAME)" --namespace "$(NAMESPACE)" --image "$(K8S_GMSA_IMAGE)" --certs-dir "$(CERTS_DIR)"
+	KUBECTL=$(KUBECTL) ./deploy/deploy-gmsa-webhook.sh --file "$(MANIFESTS_FILE)" --name "$(DEPLOYMENT_NAME)" --namespace "$(NAMESPACE)" --image "$(K8S_GMSA_IMAGE)" --certs-dir "$(CERTS_DIR)" $(EXTRA_GMSA_DEPLOY_ARGS)
 endif
 
 # copies the image to the DinD cluster only if it's not already up-to-date

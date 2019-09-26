@@ -284,6 +284,7 @@ type testConfig struct {
 	ServiceAccountName string
 	RoleBindingName    string
 	Image              string
+	ExtraSpecLines     []string
 }
 
 // integrationTestSetup creates a new namespace to play in, and returns a function to
@@ -318,6 +319,10 @@ func integrationTestSetup(t *testing.T, name string, credSpecTemplates, template
 		RoleBindingName:    name + "-use-credspecs",
 	}
 
+	if needMasterToleration(t) {
+		testConfig.ExtraSpecLines = append(testConfig.ExtraSpecLines, masterToleration...)
+	}
+
 	templatePaths := make([]string, len(credSpecTemplates)+len(templates))
 	for i, template := range append(credSpecTemplates, templates...) {
 		templatePaths[i] = renderTemplate(t, testConfig, template)
@@ -342,6 +347,32 @@ func integrationTestSetup(t *testing.T, name string, credSpecTemplates, template
 	}
 
 	return testConfig, tearDownFunc
+}
+
+var masterToleration = []string{
+	"tolerations:",
+	"- key: node-role.kubernetes.io/master",
+	"  operator: Exists",
+	"  effect: NoSchedule",
+}
+
+var allNodesHaveMasterTaint *bool
+
+// needMasterToleration returns true iff all of the cluster's nodes have the master taint.
+// Caches that in allNodesHaveMasterTaint.
+// Not thread-safe.
+func needMasterToleration(t *testing.T) bool {
+	if allNodesHaveMasterTaint == nil {
+		allMaster := true
+		for _, node := range getNodes(t) {
+			if !nodeHasMasterTaint(node) {
+				allMaster = false
+				break
+			}
+		}
+		allNodesHaveMasterTaint = &allMaster
+	}
+	return *allNodesHaveMasterTaint
 }
 
 // renderTemplate renders a template, and returns its path.

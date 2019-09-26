@@ -34,3 +34,6 @@ spec:
         securityContext:
           windowsOptions:
             gmsaCredentialSpecName: {{ index .CredSpecNames 2 }}
+{{- range $line := .ExtraSpecLines }}
+      {{ $line }}
+{{- end }}
