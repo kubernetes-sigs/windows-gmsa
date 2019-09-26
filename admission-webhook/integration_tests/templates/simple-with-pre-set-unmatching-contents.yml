@@ -26,3 +26,6 @@ spec:
       containers:
       - image: k8s.gcr.io/pause
         name: nginx
+{{- range $line := .ExtraSpecLines }}
+      {{ $line }}
+{{- end }}

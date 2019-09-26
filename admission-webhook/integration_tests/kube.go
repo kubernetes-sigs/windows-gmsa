@@ -33,6 +33,27 @@ func kubeClient(t *testing.T) kubernetes.Interface {
 	return client
 }
 
+// getNodes returns the nodes present in the cluster.
+func getNodes(t *testing.T) []corev1.Node {
+	client := kubeClient(t)
+
+	nodeList, err := client.CoreV1().Nodes().List(metav1.ListOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return nodeList.Items
+}
+
+// nodeHasMasterTaint returns true iff node has the canonical master taint.
+func nodeHasMasterTaint(node corev1.Node) bool {
+	for _, taint := range node.Spec.Taints {
+		if taint.Key == "node-role.kubernetes.io/master" && taint.Effect == "NoSchedule" {
+			return true
+		}
+	}
+	return false
+}
+
 // waitForPodToComeUp waits for a pod matching `selector` to come up in `namespace`, and returns it.
 func waitForPodToComeUp(t *testing.T, namespace, selector string, pollOps ...poll.SettingOp) *corev1.Pod {
 	fetcher := func(client kubernetes.Interface, listOptions metav1.ListOptions) ([]interface{}, error) {
