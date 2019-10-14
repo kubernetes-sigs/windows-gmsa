@@ -1,6 +1,6 @@
 ## a simple deployment trying to use a pod-level GMSA cred spec that doesn't exist
 
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:

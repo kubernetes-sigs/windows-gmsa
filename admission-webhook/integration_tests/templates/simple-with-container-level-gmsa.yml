@@ -1,6 +1,6 @@
 ## a simple deployment with a container-level GMSA cred spec
 
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
