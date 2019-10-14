@@ -1,6 +1,6 @@
 ## a simple deployment with several containers: 2 with their own GMSA, and 1 without it, plus a pod-level cred spec
 
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:

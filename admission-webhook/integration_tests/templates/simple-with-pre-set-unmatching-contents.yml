@@ -1,7 +1,7 @@
 ## a simple deployment with a fully specified GMSA cred spec (ie both its name and contents);
 ## but where the specified contents don't match the name
 
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:

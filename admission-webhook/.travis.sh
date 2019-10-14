@@ -5,7 +5,9 @@
 
 set -e
 
-KUBECTL=~/.kubeadm-dind-cluster/kubectl
+export KUBECTL="$TRAVIS_BUILD_DIR/admission-webhook/dev/kubectl"
+export KUBECONFIG="$TRAVIS_BUILD_DIR/admission-webhook/dev/kubeconfig"
+export CLUSTER_NAME=windows-gmsa-travis
 
 main() {
     case "$T" in
@@ -52,7 +54,7 @@ run_integration_tests() {
         SERVICE_IP="$($KUBECTL -n $NAMESPACE get service $DEPLOYMENT_NAME -o=jsonpath='{.spec.clusterIP}')"
 
         local INFO_OUTPUT
-        INFO_OUTPUT="$(docker exec kube-master curl -sk https://$SERVICE_IP/info)"
+        INFO_OUTPUT="$(docker exec "$CLUSTER_NAME-control-plane" curl -sk https://$SERVICE_IP/info)"
 
         if [[ "$INFO_OUTPUT" == *"$BOGUS_VERSION"* ]]; then
             echo -e "Output from /info does contain '$BOGUS_VERSION':\n$INFO_OUTPUT"
@@ -69,7 +71,7 @@ run_integration_tests() {
 run_dry_run_deploy() {
     make cluster_start
 
-    wait_for_all_terminating_k8s_resources || return $?
+    wait_for_all_terminating_or_pending_k8s_resources || return $?
 
     local SNAPSHOT_DIR='k8s_snapshot'
     k8s_snapshot $SNAPSHOT_DIR/before
@@ -123,33 +125,35 @@ list_k8s_resources() {
     fi
 }
 
-# waits for all API objects in "Terminating" state to go away, for up to
-# 60 secs per resource type
-wait_for_all_terminating_k8s_resources() {
+# waits for all API objects in "Terminating" or "Pending" state to go away,
+# for up to 120 secs per resource type
+wait_for_all_terminating_or_pending_k8s_resources() {
     local RESOURCE
     for RESOURCE in $($KUBECTL api-resources -o name); do
-        wait_for_terminating_k8s_resources "$RESOURCE" || return $?
+        wait_until_no_k8s_resources_in_state "$RESOURCE" 'Terminating' || return $?
+        wait_until_no_k8s_resources_in_state "$RESOURCE" 'Pending' || return $?
     done
 }
 
 # waits up to 60 seconds for API objects of the given resource that are
-# in "Terminating" state to go away, else errors out
-wait_for_terminating_k8s_resources() {
+# in the given state to go away, else errors out
+wait_until_no_k8s_resources_in_state() {
     local RESOURCE="$1"
+    local STATE="$2"
 
     local START="$(date -u +%s)" OUTPUT
 
     while [ "$(( $(date -u +%s) - $START ))" -le 60 ]; do
-        OUTPUT="$(list_k8s_resources "$RESOURCE" 'status.phase=="Terminating"')" || return $?
+        OUTPUT="$(list_k8s_resources "$RESOURCE" 'status.phase=="'$STATE'"')" || return $?
         if [ "$OUTPUT" ]; then
-            # there still are terminating resources
+            # there still are resources in the given state
             sleep 1
             continue
         fi
         return 0
     done
 
-    echo -e "Timed out waiting for all terminating $RESOURCE to go away:\n$OUTPUT"
+    echo -e "Timed out waiting for all $STATE $RESOURCE to go away:\n$OUTPUT"
     return 1
 }
 

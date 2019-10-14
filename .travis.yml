@@ -6,7 +6,7 @@ go:
 
 env:
   - T=unit
-  - T=integration KUBERNETES_VERSION=1.15
+  - T=integration
   - T=integration DEPLOY_METHOD=download
   - T=integration WITH_DEV_IMAGE=1
   - T=integration NUM_NODES=0 EXTRA_GMSA_DEPLOY_ARGS=--tolerate-master

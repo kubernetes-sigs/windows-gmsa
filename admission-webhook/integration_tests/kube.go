@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/mitchellh/go-homedir"
+	"github.com/stretchr/testify/require"
 	"gotest.tools/poll"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -16,7 +17,7 @@ import (
 )
 
 func kubeClient(t *testing.T) kubernetes.Interface {
-	kubeConfigPath, err := homedir.Expand("~/.kube/config")
+	kubeConfigPath, err := homedir.Expand(kubeconfig())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -38,9 +39,7 @@ func getNodes(t *testing.T) []corev1.Node {
 	client := kubeClient(t)
 
 	nodeList, err := client.CoreV1().Nodes().List(metav1.ListOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.Nil(t, err, "Unable to list nodes")
 	return nodeList.Items
 }
 
@@ -184,11 +183,19 @@ func runKubectlCommand(t *testing.T, args ...string) (success bool, stdout strin
 	return runCommand(t, kubectl(), args...)
 }
 
-func kubectl() (kubectl string) {
-	if fromEnv, present := os.LookupEnv("KUBECTL"); present && fromEnv != "" {
-		kubectl = fromEnv
+func kubectl() string {
+	return fromEnv("KUBECTL", "kubectl")
+}
+
+func kubeconfig() string {
+	return fromEnv("KUBECONFIG", "~/.kube/config")
+}
+
+func fromEnv(key, defaultValue string) (value string) {
+	if fromEnv, present := os.LookupEnv(key); present && fromEnv != "" {
+		value = fromEnv
 	} else {
-		kubectl = "kubectl"
+		value = defaultValue
 	}
 	return
 }
