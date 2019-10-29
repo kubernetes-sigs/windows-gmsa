@@ -30,11 +30,12 @@ fatal_error() {
     exit 1
 }
 
-if [ ! "$KUBECTL" ]; then
-    KUBECTL=$(which kubectl) || true
-fi
-if [ ! -x $KUBECTL ]; then
-    fatal_error 'kubectl not found'
+if [ ! -x "$KUBECTL" ]; then
+    KUBECTL=$(command -v kubectl)
+
+    if [ ! -x "$KUBECTL" ]; then
+        fatal_error 'kubectl not found'
+    fi
 fi
 
 echo_or_run() {

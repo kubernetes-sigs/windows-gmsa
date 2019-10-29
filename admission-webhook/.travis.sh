@@ -23,6 +23,10 @@ main() {
 }
 
 run_integration_tests() {
+    if [ "$WITHOUT_ENVSUBST" ] && [ -x "$(command -v envsubst)" ] && [[ "$TRAVIS" == "true" ]]; then
+        sudo rm -f "$(command -v envsubst)"
+    fi
+
     if [[ "$DEPLOY_METHOD" == 'download' ]]; then
         export K8S_GMSA_DEPLOY_METHOD='download'
 
@@ -111,7 +115,7 @@ list_k8s_resources() {
     local OUTPUT EXIT_STATUS=0
 
     # this output is guaranteed to be unique since namespaces can't contain spaces
-    OUTPUT="$($KUBECTL get "$RESOURCE" --all-namespaces -o jsonpath="{range .items[$FILTER]}{@.metadata.namespace}{\" \"}{@.metadata.name}{\" \"}{@.status.phase}{\"\n\"}{end}" 2>&1)" \
+    OUTPUT="$($KUBECTL get "$RESOURCE" --all-namespaces -o jsonpath="{range .items[$FILTER]}{@.metadata.namespace}{\" \"}{@.metadata.name}{\"\n\"}{end}" 2>&1)" \
         || EXIT_STATUS=$?
 
     if [[ $EXIT_STATUS == 0 ]]; then
