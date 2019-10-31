@@ -107,7 +107,7 @@ if ! $DRY_RUN && $KUBECTL get csr "$CSR_NAME" &> /dev/null; then
     $KUBECTL delete csr "$CSR_NAME"
 fi
 
-# create  server cert/key CSR and  send to k8s API
+# create server cert/key CSR and send to k8s API
 CSR_CONTENTS=$(cat <<EOF
 apiVersion: certificates.k8s.io/v1beta1
 kind: CertificateSigningRequest
