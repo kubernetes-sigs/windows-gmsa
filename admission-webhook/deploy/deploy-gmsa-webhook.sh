@@ -56,7 +56,23 @@ ensure_helper_file_present() {
         fi
     fi
 
-    echo "$DIR/$NAME"
+    realpath "$DIR/$NAME"
+}
+
+write_manifests_file() {
+    local TEMPLATE_PATH="$1"
+    local MANIFESTS_FILE="$2"
+
+    if [ -x "$(command -v envsubst)" ] && [ ! "$WITHOUT_ENVSUBST" ]; then
+        envsubst < "$TEMPLATE_PATH" > "$MANIFESTS_FILE"
+    elif [ -x "$(command -v docker)" ]; then
+        TMP_FILE=$(mktemp)
+        trap "rm -f $TMP_FILE" EXIT
+        export -p > "$TMP_FILE"
+        docker run --rm -v "$TEMPLATE_PATH:$TEMPLATE_PATH" -v "$TMP_FILE:$TMP_FILE" wk88/envsubst "$TEMPLATE_PATH" "$TMP_FILE" > "$MANIFESTS_FILE"
+    else
+        fatal_error "Unable to run envsubst"
+    fi
 }
 
 main() {
@@ -102,10 +118,6 @@ main() {
     . "$HELPER_SCRIPT"
     local CREATE_SIGNED_CERT_SCRIPT
     CREATE_SIGNED_CERT_SCRIPT=$(ensure_helper_file_present 'create-signed-cert.sh')
-
-    if [ ! -x "$(command -v envsubst)" ]; then
-        fatal_error 'envsubst not found'
-    fi
 
     if [ -d "$CERTS_DIR" ]; then
         $OVERWRITE || warn "Certs dir $CERTS_DIR already exists"
@@ -158,7 +170,7 @@ main() {
         NAMESPACE="$NAMESPACE" \
         IMAGE_NAME="$IMAGE_NAME" \
         TOLERATIONS="$TOLERATIONS" \
-        envsubst < "$TEMPLATE_PATH" > "$MANIFESTS_FILE"
+        write_manifests_file "$TEMPLATE_PATH" "$MANIFESTS_FILE"
 
     echo_or_run --with-kubectl-dry-run "$KUBECTL apply -f $MANIFESTS_FILE"
 

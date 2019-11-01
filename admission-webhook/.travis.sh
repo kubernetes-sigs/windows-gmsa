@@ -23,6 +23,10 @@ main() {
 }
 
 run_integration_tests() {
+    if [ "$WITHOUT_ENVSUBST" ] && [ -x "$(command -v envsubst)" ] && [[ "$TRAVIS" == "true" ]]; then
+        sudo rm -f "$(command -v envsubst)"
+    fi
+
     if [[ "$DEPLOY_METHOD" == 'download' ]]; then
         export K8S_GMSA_DEPLOY_METHOD='download'
 
