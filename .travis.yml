@@ -10,6 +10,7 @@ env:
   - T=integration DEPLOY_METHOD=download
   - T=integration WITH_DEV_IMAGE=1
   - T=integration NUM_NODES=0 EXTRA_GMSA_DEPLOY_ARGS=--tolerate-master
+  - T=integration WITHOUT_ENVSUBST=1
   - T=dry_run_deploy
 
 install:
