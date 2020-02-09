@@ -17,7 +17,7 @@ This script:
  * deploys a k8s service running the webhook
  * registers that service as a webhook admission controller
 
-usage: $0 --file MANIFESTS_FILE [--name NAME] [--namespace NAMESPACE] [--image IMAGE_NAME] [--certs-dir CERTS_DIR] [--dry-run] [--overwrite] [--tolerate-master]
+usage: $0 --file MANIFESTS_FILE [--name NAME] [--namespace NAMESPACE] [--image IMAGE_NAME] [--certs-dir CERTS_DIR] [--dry-run] [--overwrite] [--tolerate-master] [--rancher]
 
 MANIFESTS_FILE is the path to the file the k8s manifests will be written to.
 NAME defaults to 'gmsa-webhook' and is used in the names of most of the k8s resources created.
@@ -84,6 +84,7 @@ main() {
     local DRY_RUN=false
     local OVERWRITE=false
     local TOLERATE_MASTER=false
+    local RANCHER=false
 
     # parse arguments
     while [[ $# -gt 0 ]]; do
@@ -104,6 +105,8 @@ main() {
                 OVERWRITE=true && shift ;;
             --tolerate-master)
                 TOLERATE_MASTER=true && shift ;;
+            --rancher)
+                RANCHER=true && shift ;;
             *)
                 echo "Unknown option: $1"
                 usage ;;
@@ -155,16 +158,41 @@ main() {
 
     TOLERATIONS=''
     if $TOLERATE_MASTER; then
+      if ! $RANCHER; then
         TOLERATIONS='
       tolerations:
       - key: node-role.kubernetes.io/master
         operator: Exists
         effect: NoSchedule'
+      else
+        TOLERATIONS='
+      tolerations:
+      - key: node-role.kubernetes.io/master
+        operator: Exists
+        effect: NoSchedule
+      - key: cattle.io/os
+        operator: Equal
+        value: linux
+        effect: NoSchedule'
+      fi
+    elif $RANCHER; then
+        TOLERATIONS='
+      tolerations:
+      - key: cattle.io/os
+        operator: Equal
+        value: linux
+        effect: NoSchedule'
+    fi
+
+    if ! $RANCHER; then
+        CA_DATA="$($KUBECTL config view --raw --minify --flatten -o jsonpath='{.clusters[].cluster.certificate-authority-data}')"
+    else
+        CA_DATA="$($KUBECTL config view --raw -o jsonpath='{.clusters[1].cluster.certificate-authority-data}')"
     fi
 
     TLS_PRIVATE_KEY=$(cat "$SERVER_KEY" | base64 -w 0) \
         TLS_CERTIFICATE="$TLS_CERTIFICATE" \
-        CA_BUNDLE="$($KUBECTL config view --raw --minify --flatten -o jsonpath='{.clusters[].cluster.certificate-authority-data}')" \
+        CA_BUNDLE="$CA_DATA" \
         RBAC_ROLE_NAME="$NAMESPACE-$NAME-rbac-role" \
         NAME="$NAME" \
         NAMESPACE="$NAMESPACE" \
