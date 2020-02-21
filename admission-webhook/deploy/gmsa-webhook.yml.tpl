@@ -5,8 +5,6 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: ${NAMESPACE}
-  labels:
-    gmsa-webhook: disabled
 
 ---
 
@@ -150,8 +148,8 @@ webhooks:
   namespaceSelector:
     matchExpressions:
       - key: gmsa-webhook
-        operator: NotIn
-        values: [disabled]
+        operator: In
+        values: [enabled]
 
 ---
 
@@ -177,5 +175,5 @@ webhooks:
   namespaceSelector:
     matchExpressions:
     - key: gmsa-webhook
-      operator: NotIn
-      values: [disabled]
+      operator: In
+      values: [enabled]
