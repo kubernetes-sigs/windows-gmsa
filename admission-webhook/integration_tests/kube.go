@@ -155,6 +155,7 @@ func createNamespace(t *testing.T, name string) string {
 	}
 
 	runKubectlCommandOrFail(t, "create", "namespace", name)
+	runKubectlCommandOrFail(t, "label", "namespace", name, "gmsa-webhook=enabled")
 
 	return name
 }
