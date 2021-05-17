@@ -109,7 +109,7 @@ fi
 
 # create server cert/key CSR and send to k8s API
 CSR_CONTENTS=$(cat <<EOF
-apiVersion: certificates.k8s.io/v1beta1
+apiVersion: certificates.k8s.io/v1
 kind: CertificateSigningRequest
 metadata:
   name: $CSR_NAME
