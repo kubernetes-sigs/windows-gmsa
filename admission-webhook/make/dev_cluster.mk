@@ -1,12 +1,8 @@
 # K8S version can be overriden
 # see available versions at https://hub.docker.com/r/kindest/node/tags
-KUBERNETES_VERSION ?= 1.16.1
+KUBERNETES_VERSION ?= 1.21.1
 # see https://github.com/kubernetes-sigs/kind/releases
-KIND_VERSION = 0.5.1
-
-ifeq ($(filter $(KUBERNETES_VERSION),1.16.1),)
-$(error "Kubernetes version $(KUBERNETES_VERSION) not supported")
-endif
+KIND_VERSION = 0.11.0
 
 CLUSTER_NAME ?= windows-gmsa-dev
 DEPLOYMENT_NAME ?= windows-gmsa-dev
@@ -38,7 +34,7 @@ cluster_start: $(KIND) $(KUBECTL)
 	KUBECONFIG=$(KUBECONFIG) $(KUBECTL) version
 	# coredns has a thing for creating API resources continually, which confuses the dry-run test
 	# since it's not needed for anything here, there's no reason to keep it around
-	KUBECONFIG=$(KUBECONFIG) $(KUBECTL) delete -n kube-system deployment.apps/coredns
+	KUBECONFIG=$(KUBECONFIG) $(KUBECTL) delete -n kube-system deployment.apps/coredns || true
 	# kind removes the taint on master when NUM_NODES is 0 - but we do want to test that case too!
 	KUBECONFIG=$(KUBECONFIG) $(KUBECTL) taint node $(CLUSTER_NAME)-control-plane 'node-role.kubernetes.io/master=true:NoSchedule' --overwrite
 	@ echo -e 'Cluster started, KUBECONFIG available at $(KUBECONFIG), eg\nexport KUBECONFIG=$(KUBECONFIG)'
@@ -83,11 +79,7 @@ cluster_symlinks:
 # starts the kind cluster only if it's not already running
 .PHONY: _start_cluster_if_not_running
 _start_cluster_if_not_running: $(KUBECTL) $(KIND)
-	@ if KUBECONFIG=$(KUBECONFIG) timeout 2 $(KUBECTL) version &> /dev/null; then \
-		echo "Dev cluster already running"; \
-	else \
-		$(MAKE) cluster_start; \
-	fi
+	$(MAKE) cluster_start
 
 # deploys the webhook to the kind cluster
 # if $K8S_GMSA_DEPLOY_METHOD is set to "download", then it will deploy by downloading

@@ -7,6 +7,7 @@ WORKDIR /go/src/sigs.k8s.io/windows-gmsa/admission-webhook
 
 # copy go dependencies
 COPY /vendor ./vendor
+COPY go.mod ./go.mod
 
 # build
 COPY *.go ./
