@@ -16,6 +16,11 @@ EOF
     exit 1
 }
 
+setkubeconfig() {
+    mkdir -p ~/.kube
+    $KIND_BIN get kubeconfig --name "$NAME" >  ~/.kube/kind-config-$NAME
+}
+
 main() {
     local NAME=
     local NUM_NODES=
@@ -44,6 +49,7 @@ main() {
 
     if [[ "$(${KIND_BIN} get clusters)" == *"${NAME}"* ]]; then
   	  echo "Dev cluster already running. Skipping cluster creation";
+      setkubeconfig
   	  exit 0
   	else
   	  echo "Starting new cluster";
@@ -77,7 +83,7 @@ EOF
     # run kind
     local EXIT_STATUS=0
     $KIND_BIN create cluster --name "$NAME" --config "$CONFIG_FILE" --image "kindest/node:v$VERSION" --wait 240s || EXIT_STATUS=$?
-    $KIND_BIN get kubeconfig --name "$NAME" >  ~/.kube/kind-config-$NAME
+    setkubeconfig
 
     # clean up the config file
     rm -f "$CONFIG_FILE"
