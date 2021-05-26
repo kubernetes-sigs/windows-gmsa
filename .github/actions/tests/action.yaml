@@ -8,4 +8,4 @@ runs:
     - name: run tests
       shell: bash
       run: |
-        cd ./admission-webhook && ./.travis.sh
+        cd ./admission-webhook && ./run-ci.sh

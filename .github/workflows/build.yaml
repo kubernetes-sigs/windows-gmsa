@@ -33,7 +33,7 @@ jobs:
       uses: ./.github/actions/tests
       env:
         T: integration
-  deploy_method_download:
+  deploy-method-download:
     runs-on: ubuntu-18.04
     steps:
     - uses: actions/checkout@v2
@@ -46,7 +46,7 @@ jobs:
       env:
         T: integration
         DEPLOY_METHOD: download
-  tolerate_control_plane:
+  tolerate-control-plane:
     runs-on: ubuntu-18.04
     steps:
     - uses: actions/checkout@v2
@@ -60,7 +60,7 @@ jobs:
         T: integration
         NUM_NODES: 0
         EXTRA_GMSA_DEPLOY_ARGS: --tolerate-master
-  dry_run_deploy:
+  dry-run-deploy:
     runs-on: ubuntu-18.04
     steps:
     - uses: actions/checkout@v2

@@ -71,8 +71,8 @@ endif
 # cluster_symlinks symlinks kubectl to dev/kubectl, and the kube config to dev/kubeconfig (used in ci)
 .PHONY:
 cluster_symlinks:
-	ln -sfv $(KUBECTL) $(DEV_DIR)/kubectl
-	ln -sfv $(KUBECONFIG) $(DEV_DIR)/kubeconfig
+	ln -sfv $(KUBECTL) $(DEV_DIR)/kubectl-$(CLUSTER_NAME)
+	ln -sfv $(KUBECONFIG) $(DEV_DIR)/kubeconfig-$(CLUSTER_NAME)
 
 ### "Private" targets below ###
 
@@ -110,7 +110,6 @@ ifeq ($(K8S_GMSA_DEPLOY_METHOD),download)
       && CMD="curl -sL 'https://raw.githubusercontent.com/$$K8S_GMSA_DEPLOY_DOWNLOAD_REPO/$$K8S_GMSA_DEPLOY_DOWNLOAD_REV/admission-webhook/deploy/deploy-gmsa-webhook.sh' | K8S_GMSA_DEPLOY_DOWNLOAD_REPO='$$K8S_GMSA_DEPLOY_DOWNLOAD_REPO' K8S_GMSA_DEPLOY_DOWNLOAD_REV='$$K8S_GMSA_DEPLOY_DOWNLOAD_REV' KUBECONFIG=$(KUBECONFIG) KUBECTL=$(KUBECTL) bash -s -- --file '$(MANIFESTS_FILE)' --name '$(DEPLOYMENT_NAME)' --namespace '$(NAMESPACE)' --image '$(K8S_GMSA_IMAGE)' --certs-dir '$(CERTS_DIR)' $(EXTRA_GMSA_DEPLOY_ARGS)" \
       && echo "$$CMD" && eval "$$CMD"
 else
-	@echo HERE
 	KUBECONFIG=$(KUBECONFIG) KUBECTL=$(KUBECTL) ./deploy/deploy-gmsa-webhook.sh --file "$(MANIFESTS_FILE)" --name "$(DEPLOYMENT_NAME)" --namespace "$(NAMESPACE)" --image "$(K8S_GMSA_IMAGE)" --certs-dir "$(CERTS_DIR)" $(EXTRA_GMSA_DEPLOY_ARGS)
 endif
 

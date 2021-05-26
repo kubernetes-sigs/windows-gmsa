@@ -5,9 +5,10 @@
 
 set -e
 
-export KUBECTL="$GITHUB_WORKSPACE/admission-webhook/dev/kubectl"
-export KUBECONFIG="$GITHUB_WORKSPACE/admission-webhook/dev/kubeconfig"
-export CLUSTER_NAME=windows-gmsa-travis
+# giving a unique name allows running locally with https://github.com/nektos/act
+export CLUSTER_NAME="windows-gmsa-$GITHUB_JOB"
+export KUBECTL="$GITHUB_WORKSPACE/admission-webhook/dev/kubectl-$CLUSTER_NAME"
+export KUBECONFIG="$GITHUB_WORKSPACE/admission-webhook/dev/kubeconfig-$CLUSTER_NAME"
 
 main() {
     case "$T" in
@@ -124,7 +125,7 @@ list_k8s_resources() {
     elif [[ $EXIT_STATUS == 0 ]]; then
         echo "$OUTPUT"
         return 0
-    elif [[ "$OUTPUT" == *'(NotFound)'* ]] || [[ "$OUTPUT" == *'(MethodNotAllowed)'* ]] ; then
+    elif [[ "$OUTPUT" == *'(NotFound)'* ]] || [[ "$OUTPUT" == *'(MethodNotAllowed)'* ]]; then
         return 0
     else
         echo "Error when listing k8s resource $RESOURCE: $OUTPUT" 1>&2

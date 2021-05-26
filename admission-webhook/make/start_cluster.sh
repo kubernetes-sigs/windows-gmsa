@@ -48,7 +48,7 @@ main() {
     [ "$NAME" ] && [ "$NUM_NODES" ] && [ "$VERSION" ] || usage
 
     if [[ "$(${KIND_BIN} get clusters)" == *"${NAME}"* ]]; then
-  	  echo "Dev cluster already running. Skipping cluster creation";
+  	  echo "Dev cluster already running. Skipping cluster creation"
       setkubeconfig
   	  exit 0
   	else
