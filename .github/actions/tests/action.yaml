@@ -4,7 +4,7 @@ runs:
   steps:
     - name: install envsub
       shell: bash
-      run: apt-get update && apt-get -y install gettext-base
+      run: sudo apt-get update && sudo apt-get -y install gettext-base
     - name: run tests
       shell: bash
       run: |
