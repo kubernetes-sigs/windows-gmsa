@@ -16,6 +16,11 @@ EOF
     exit 1
 }
 
+setkubeconfig() {
+    mkdir -p ~/.kube
+    $KIND_BIN get kubeconfig --name "$NAME" >  ~/.kube/kind-config-$NAME
+}
+
 main() {
     local NAME=
     local NUM_NODES=
@@ -42,13 +47,21 @@ main() {
 
     [ "$NAME" ] && [ "$NUM_NODES" ] && [ "$VERSION" ] || usage
 
+    if [[ "$(${KIND_BIN} get clusters)" == *"${NAME}"* ]]; then
+  	  echo "Dev cluster already running. Skipping cluster creation"
+      setkubeconfig
+  	  exit 0
+  	else
+  	  echo "Starting new cluster";
+  	fi
+
     local CONFIG_FILE
     CONFIG_FILE="$(mktemp /tmp/gmsa-webhook-kind-config.XXXXXXX)"
 
     # generate the config file
     cat <<EOF > "$CONFIG_FILE"
 kind: Cluster
-apiVersion: kind.sigs.k8s.io/v1alpha3
+apiVersion: kind.x-k8s.io/v1alpha4
 kubeadmConfigPatches:
 - |
   apiVersion: kubeadm.k8s.io/v1beta2
@@ -70,6 +83,7 @@ EOF
     # run kind
     local EXIT_STATUS=0
     $KIND_BIN create cluster --name "$NAME" --config "$CONFIG_FILE" --image "kindest/node:v$VERSION" --wait 240s || EXIT_STATUS=$?
+    setkubeconfig
 
     # clean up the config file
     rm -f "$CONFIG_FILE"

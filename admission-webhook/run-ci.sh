@@ -5,9 +5,10 @@
 
 set -e
 
-export KUBECTL="$TRAVIS_BUILD_DIR/admission-webhook/dev/kubectl"
-export KUBECONFIG="$TRAVIS_BUILD_DIR/admission-webhook/dev/kubeconfig"
-export CLUSTER_NAME=windows-gmsa-travis
+# giving a unique name allows running locally with https://github.com/nektos/act
+export CLUSTER_NAME="windows-gmsa-$GITHUB_JOB"
+export KUBECTL="$GITHUB_WORKSPACE/admission-webhook/dev/kubectl-$CLUSTER_NAME"
+export KUBECONFIG="$GITHUB_WORKSPACE/admission-webhook/dev/kubeconfig-$CLUSTER_NAME"
 
 main() {
     case "$T" in
@@ -118,7 +119,10 @@ list_k8s_resources() {
     OUTPUT="$($KUBECTL get "$RESOURCE" --all-namespaces -o jsonpath="{range .items[$FILTER]}{@.metadata.namespace}{\" \"}{@.metadata.name}{\"\n\"}{end}" 2>&1)" \
         || EXIT_STATUS=$?
 
-    if [[ $EXIT_STATUS == 0 ]]; then
+    if [[ "$OUTPUT" == *'deprecated'* ]]; then
+        # component status is deprecated in 1.19 and fails https://github.com/kubernetes-sigs/kind/issues/1998
+        return 0
+    elif [[ $EXIT_STATUS == 0 ]]; then
         echo "$OUTPUT"
         return 0
     elif [[ "$OUTPUT" == *'(NotFound)'* ]] || [[ "$OUTPUT" == *'(MethodNotAllowed)'* ]]; then
@@ -151,6 +155,7 @@ wait_until_no_k8s_resources_in_state() {
         OUTPUT="$(list_k8s_resources "$RESOURCE" 'status.phase=="'$STATE'"')" || return $?
         if [ "$OUTPUT" ]; then
             # there still are resources in the given state
+            echo "still waiting on $RESOURCE $OUTPUT"
             sleep 1
             continue
         fi

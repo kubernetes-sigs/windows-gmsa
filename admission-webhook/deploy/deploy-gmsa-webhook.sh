@@ -65,11 +65,6 @@ write_manifests_file() {
 
     if [ -x "$(command -v envsubst)" ] && [ ! "$WITHOUT_ENVSUBST" ]; then
         envsubst < "$TEMPLATE_PATH" > "$MANIFESTS_FILE"
-    elif [ -x "$(command -v docker)" ]; then
-        TMP_FILE=$(mktemp)
-        trap "rm -f $TMP_FILE" EXIT
-        export -p > "$TMP_FILE"
-        docker run --rm -v "$TEMPLATE_PATH:$TEMPLATE_PATH" -v "$TMP_FILE:$TMP_FILE" wk88/envsubst "$TEMPLATE_PATH" "$TMP_FILE" > "$MANIFESTS_FILE"
     else
         fatal_error "Unable to run envsubst"
     fi

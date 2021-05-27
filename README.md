@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/kubernetes-sigs/windows-gmsa.svg?branch=master)](https://travis-ci.org/kubernetes-sigs/windows-gmsa)
+![Build Status](https://github.com/kubernetes-sigs/windows-gmsa/actions/workflows/build.yaml/badge.svg)
 
 # Kubernetes Windows GMSA
 

@@ -1,0 +1,11 @@
+name: 'run tests'
+runs:
+  using: "composite"
+  steps:
+    - name: install envsub
+      shell: bash
+      run: apt-get update && apt-get -y install gettext-base
+    - name: run tests
+      shell: bash
+      run: |
+        cd ./admission-webhook && ./run-ci.sh

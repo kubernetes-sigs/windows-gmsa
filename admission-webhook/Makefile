@@ -22,7 +22,7 @@ endif
 include make/*.mk
 
 .PHONY: test
-test: unit_tests integration_tests
+test: deps_install unit_tests integration_tests
 
 # the UNIT_TEST_FLAGS env var can be set to eg run only specific tests, e.g:
 # UNIT_TEST_FLAGS='-test.run TestHTTPWebhook' make unit_tests

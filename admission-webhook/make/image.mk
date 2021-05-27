@@ -1,5 +1,5 @@
 # must stay consistent with the go version defined in .travis.yml
-GO_VERSION = 1.12
+GO_VERSION = 1.16
 VERSION = $(shell git rev-parse HEAD)
 DOCKER_BUILD = docker build . --build-arg GO_VERSION=$(GO_VERSION) --build-arg VERSION=$(VERSION)
 
