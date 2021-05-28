@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -54,14 +55,14 @@ func TestHTTPWebhook(t *testing.T) {
 	authorizedToUseCredSpec := true
 
 	kubeClient := &dummyKubeClient{
-		isAuthorizedToUseCredSpecFunc: func(serviceAccountName, namespace, credSpecName string) (authorized bool, reason string) {
+		isAuthorizedToUseCredSpecFunc: func(ctx context.Context, serviceAccountName, namespace, credSpecName string) (authorized bool, reason string) {
 			assert.Equal(t, dummyServiceAccoutName, serviceAccountName)
 			assert.Equal(t, dummyNamespace, namespace)
 			assert.Equal(t, dummyCredSpecName, credSpecName)
 
 			return authorizedToUseCredSpec, "bogus reason"
 		},
-		retrieveCredSpecContentsFunc: func(credSpecName string) (contents string, httpCode int, err error) {
+		retrieveCredSpecContentsFunc: func(ctx context.Context, credSpecName string) (contents string, httpCode int, err error) {
 			assert.Equal(t, dummyCredSpecName, credSpecName)
 
 			contents = dummyCredSpecContents

@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"testing"
@@ -13,7 +14,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 func kubeClient(t *testing.T) kubernetes.Interface {
@@ -38,7 +38,7 @@ func kubeClient(t *testing.T) kubernetes.Interface {
 func getNodes(t *testing.T) []corev1.Node {
 	client := kubeClient(t)
 
-	nodeList, err := client.CoreV1().Nodes().List(metav1.ListOptions{})
+	nodeList, err := client.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 	require.Nil(t, err, "Unable to list nodes")
 	return nodeList.Items
 }
@@ -56,7 +56,7 @@ func nodeHasMasterTaint(node corev1.Node) bool {
 // waitForPodToComeUp waits for a pod matching `selector` to come up in `namespace`, and returns it.
 func waitForPodToComeUp(t *testing.T, namespace, selector string, pollOps ...poll.SettingOp) *corev1.Pod {
 	fetcher := func(client kubernetes.Interface, listOptions metav1.ListOptions) ([]interface{}, error) {
-		podList, err := client.CoreV1().Pods(namespace).List(listOptions)
+		podList, err := client.CoreV1().Pods(namespace).List(context.Background(), listOptions)
 		if err == nil {
 			result := make([]interface{}, len(podList.Items))
 			for i, item := range podList.Items {
@@ -75,7 +75,7 @@ func waitForPodToComeUp(t *testing.T, namespace, selector string, pollOps ...pol
 // waitForReplicaSet waits for a replica set matching `selector` to come up in `namespace`, and returns it.
 func waitForReplicaSet(t *testing.T, namespace, selector string, pollOps ...poll.SettingOp) *appsv1.ReplicaSet {
 	fetcher := func(client kubernetes.Interface, listOptions metav1.ListOptions) ([]interface{}, error) {
-		rsList, err := client.AppsV1().ReplicaSets(namespace).List(listOptions)
+		rsList, err := client.AppsV1().ReplicaSets(namespace).List(context.Background(), listOptions)
 		if err == nil {
 			result := make([]interface{}, len(rsList.Items))
 			for i, item := range rsList.Items {
@@ -100,7 +100,7 @@ func waitForReplicaSetGen1(t *testing.T, namespace, selector string, pollOps ...
 	client := kubeClient(t)
 
 	pollingFunc := func(_ poll.LogT) poll.Result {
-		replicaSet, err = client.AppsV1().ReplicaSets(namespace).Get(replicaSet.Name, metav1.GetOptions{})
+		replicaSet, err = client.AppsV1().ReplicaSets(namespace).Get(context.Background(), replicaSet.Name, metav1.GetOptions{})
 		if err != nil {
 			return poll.Error(err)
 		}
@@ -147,11 +147,15 @@ func waitForKubeObject(t *testing.T, fetcher func(kubernetes.Interface, metav1.L
 
 const testNamespacePrefix = "gmsa-webhook-test-"
 
+// value from https://github.com/kubernetes/kubernetes/blob/5e58841cce77d4bc13713ad2b91fa0d961e69192/pkg/volume/util/attach_limit.go#L53-L54
+// removed so we didn't need to import the entire kubernetes source which is technically not supported
+const resourceNameLengthLimit = 63
+
 // createNamespace creates a new namespace, and fails the test if it already exists.
 // if passed an empty string, it picks a random name and returns it.
 func createNamespace(t *testing.T, name string) string {
 	if name == "" {
-		name = testNamespacePrefix + randomHexString(t, util.ResourceNameLengthLimit-len(testNamespacePrefix))
+		name = testNamespacePrefix + randomHexString(t, resourceNameLengthLimit-len(testNamespacePrefix))
 	}
 
 	runKubectlCommandOrFail(t, "create", "namespace", name)

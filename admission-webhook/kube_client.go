@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -8,10 +9,10 @@ import (
 	authorizationv1 "k8s.io/api/authorization/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/serviceaccount"
 )
 
 const (
@@ -53,7 +54,7 @@ func newKubeClient(config *rest.Config) (*kubeClient, error) {
 
 // isAuthorizedToReadConfigMap checks whether a given service account is authorized to `use` a given cred spec.
 // If it denies the request, it also returns a string explaining why.
-func (kc *kubeClient) isAuthorizedToUseCredSpec(serviceAccountName, namespace, credSpecName string) (bool, string) {
+func (kc *kubeClient) isAuthorizedToUseCredSpec(ctx context.Context, serviceAccountName, namespace, credSpecName string) (bool, string) {
 	serviceAccountUserInfo := serviceaccount.UserInfo(namespace, serviceAccountName, "")
 
 	// needed to cast `authorizationv1.ExtraValue` to `[]string`
@@ -82,7 +83,7 @@ func (kc *kubeClient) isAuthorizedToUseCredSpec(serviceAccountName, namespace, c
 		},
 	}
 
-	response, err := kc.coreClient.AuthorizationV1().LocalSubjectAccessReviews(namespace).Create(&subjectAccessReview)
+	response, err := kc.coreClient.AuthorizationV1().LocalSubjectAccessReviews(namespace).Create(ctx, &subjectAccessReview, metav1.CreateOptions{})
 	if err != nil {
 		return false, fmt.Sprintf("error when checking authz access: %v", err.Error())
 	}
@@ -91,13 +92,13 @@ func (kc *kubeClient) isAuthorizedToUseCredSpec(serviceAccountName, namespace, c
 
 // retrieveCredSpecContents fetches the actual contents of a cred spec.
 // If it returns an error, it also returns the corresponding HTTP code.
-func (kc *kubeClient) retrieveCredSpecContents(credSpecName string) (string, int, error) {
+func (kc *kubeClient) retrieveCredSpecContents(ctx context.Context, credSpecName string) (string, int, error) {
 	resource := schema.GroupVersionResource{
 		Group:    crdAPIGroup,
 		Version:  crdAPIVersion,
 		Resource: crdResourceName,
 	}
-	credSpec, err := kc.dynamicClient.Resource(resource).Get(credSpecName, metav1.GetOptions{})
+	credSpec, err := kc.dynamicClient.Resource(resource).Get(ctx, credSpecName, metav1.GetOptions{})
 	if err != nil {
 		if isNotFoundError(err) {
 			return "", http.StatusNotFound, fmt.Errorf("cred spec %s does not exist", credSpecName)
