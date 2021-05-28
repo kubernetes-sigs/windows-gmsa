@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -25,7 +26,7 @@ func TestValidateCreateRequest(t *testing.T) {
 			webhook := newWebhook(nil)
 			pod := buildPod(dummyServiceAccoutName, winOptionsFactory(), map[string]*corev1.WindowsSecurityContextOptions{dummyContainerName: winOptionsFactory()})
 
-			response, err := webhook.validateCreateRequest(pod, dummyNamespace)
+			response, err := webhook.validateCreateRequest(context.Background(), pod, dummyNamespace)
 			assert.Nil(t, err)
 
 			require.NotNil(t, response)
@@ -35,7 +36,7 @@ func TestValidateCreateRequest(t *testing.T) {
 
 	kubeClientFactory := func() *dummyKubeClient {
 		return &dummyKubeClient{
-			retrieveCredSpecContentsFunc: func(credSpecName string) (contents string, httpCode int, err error) {
+			retrieveCredSpecContentsFunc: func(ctx context.Context, credSpecName string) (contents string, httpCode int, err error) {
 				if credSpecName == dummyCredSpecName {
 					contents = dummyCredSpecContents
 				} else {
@@ -56,7 +57,7 @@ func TestValidateCreateRequest(t *testing.T) {
 
 			setWindowsOptions(optionsSelector(pod), dummyCredSpecName, dummyCredSpecContents)
 
-			response, err := webhook.validateCreateRequest(pod, dummyNamespace)
+			response, err := webhook.validateCreateRequest(context.Background(), pod, dummyNamespace)
 			assert.Nil(t, err)
 
 			require.NotNil(t, response)
@@ -72,7 +73,7 @@ func TestValidateCreateRequest(t *testing.T) {
 				`{"All in all you're just another":      {"the":"wall","brick":   "in"},"We don't need no":["education", "thought control","dark sarcasm in the classroom"]}`,
 			)
 
-			response, err := webhook.validateCreateRequest(pod, dummyNamespace)
+			response, err := webhook.validateCreateRequest(context.Background(), pod, dummyNamespace)
 			assert.Nil(t, err)
 
 			require.NotNil(t, response)
@@ -88,7 +89,7 @@ func TestValidateCreateRequest(t *testing.T) {
 				`{"We don't need no": ["money"], "All in all you're just another": {"brick": "in", "the": "wall"}}`,
 			)
 
-			response, err := webhook.validateCreateRequest(pod, dummyNamespace)
+			response, err := webhook.validateCreateRequest(context.Background(), pod, dummyNamespace)
 			assert.Nil(t, response)
 
 			assertPodAdmissionErrorContains(t, err, pod, http.StatusUnprocessableEntity,
@@ -101,7 +102,7 @@ func TestValidateCreateRequest(t *testing.T) {
 
 			setWindowsOptions(optionsSelector(pod), dummyCredSpecName, "i ain't no JSON object")
 
-			response, err := webhook.validateCreateRequest(pod, dummyNamespace)
+			response, err := webhook.validateCreateRequest(context.Background(), pod, dummyNamespace)
 			assert.Nil(t, response)
 
 			assertPodAdmissionErrorContains(t, err, pod, http.StatusUnprocessableEntity,
@@ -114,7 +115,7 @@ func TestValidateCreateRequest(t *testing.T) {
 
 			setWindowsOptions(optionsSelector(pod), "", dummyCredSpecContents)
 
-			response, err := webhook.validateCreateRequest(pod, dummyNamespace)
+			response, err := webhook.validateCreateRequest(context.Background(), pod, dummyNamespace)
 
 			assert.Nil(t, response)
 
@@ -127,7 +128,7 @@ func TestValidateCreateRequest(t *testing.T) {
 			dummyReason := "dummy reason"
 
 			client := kubeClientFactory()
-			client.isAuthorizedToUseCredSpecFunc = func(serviceAccountName, namespace, credSpecName string) (authorized bool, reason string) {
+			client.isAuthorizedToUseCredSpecFunc = func(ctx context.Context, serviceAccountName, namespace, credSpecName string) (authorized bool, reason string) {
 				if credSpecName == dummyCredSpecName {
 					assert.Equal(t, dummyServiceAccoutName, serviceAccountName)
 					assert.Equal(t, dummyNamespace, namespace)
@@ -142,7 +143,7 @@ func TestValidateCreateRequest(t *testing.T) {
 
 			setWindowsOptions(optionsSelector(pod), dummyCredSpecName, dummyCredSpecContents)
 
-			response, err := webhook.validateCreateRequest(pod, dummyNamespace)
+			response, err := webhook.validateCreateRequest(context.Background(), pod, dummyNamespace)
 			assert.Nil(t, response)
 
 			assertPodAdmissionErrorContains(t, err, pod, http.StatusForbidden,
@@ -155,18 +156,18 @@ func TestValidateCreateRequest(t *testing.T) {
 
 			client := kubeClientFactory()
 			previousRetrieveCredSpecContentsFunc := client.retrieveCredSpecContentsFunc
-			client.retrieveCredSpecContentsFunc = func(credSpecName string) (contents string, httpCode int, err error) {
+			client.retrieveCredSpecContentsFunc = func(ctx context.Context, credSpecName string) (contents string, httpCode int, err error) {
 				if credSpecName == dummyCredSpecName {
 					return "", http.StatusNotFound, dummyError
 				}
-				return previousRetrieveCredSpecContentsFunc(credSpecName)
+				return previousRetrieveCredSpecContentsFunc(ctx, credSpecName)
 			}
 
 			webhook := newWebhook(client)
 
 			setWindowsOptions(optionsSelector(pod), dummyCredSpecName, dummyCredSpecContents)
 
-			response, err := webhook.validateCreateRequest(pod, dummyNamespace)
+			response, err := webhook.validateCreateRequest(context.Background(), pod, dummyNamespace)
 
 			assert.Nil(t, response)
 
@@ -188,7 +189,7 @@ func TestMutateCreateRequest(t *testing.T) {
 			webhook := newWebhook(nil)
 			pod := buildPod(dummyServiceAccoutName, winOptionsFactory(), map[string]*corev1.WindowsSecurityContextOptions{dummyContainerName: winOptionsFactory()})
 
-			response, err := webhook.mutateCreateRequest(pod)
+			response, err := webhook.mutateCreateRequest(context.Background(), pod)
 			assert.Nil(t, err)
 
 			require.NotNil(t, response)
@@ -198,7 +199,7 @@ func TestMutateCreateRequest(t *testing.T) {
 
 	kubeClientFactory := func() *dummyKubeClient {
 		return &dummyKubeClient{
-			retrieveCredSpecContentsFunc: func(credSpecName string) (contents string, httpCode int, err error) {
+			retrieveCredSpecContentsFunc: func(ctx context.Context, credSpecName string) (contents string, httpCode int, err error) {
 				if credSpecName == dummyCredSpecName {
 					contents = dummyCredSpecContents
 				} else {
@@ -219,7 +220,7 @@ func TestMutateCreateRequest(t *testing.T) {
 
 			setWindowsOptions(optionsSelector(pod), dummyCredSpecName, "")
 
-			response, err := webhook.mutateCreateRequest(pod)
+			response, err := webhook.mutateCreateRequest(context.Background(), pod)
 			assert.Nil(t, err)
 
 			require.NotNil(t, response)
@@ -284,7 +285,7 @@ func TestMutateCreateRequest(t *testing.T) {
 
 			setWindowsOptions(optionsSelector(pod), dummyCredSpecName, `{"pre-set GMSA": "cred contents"}`)
 
-			response, err := webhook.mutateCreateRequest(pod)
+			response, err := webhook.mutateCreateRequest(context.Background(), pod)
 			assert.Nil(t, err)
 
 			// all the patches we receive should be for the extra containers
@@ -310,18 +311,18 @@ func TestMutateCreateRequest(t *testing.T) {
 
 			client := kubeClientFactory()
 			previousRetrieveCredSpecContentsFunc := client.retrieveCredSpecContentsFunc
-			client.retrieveCredSpecContentsFunc = func(credSpecName string) (contents string, httpCode int, err error) {
+			client.retrieveCredSpecContentsFunc = func(ctx context.Context, credSpecName string) (contents string, httpCode int, err error) {
 				if credSpecName == dummyCredSpecName {
 					return "", http.StatusNotFound, dummyError
 				}
-				return previousRetrieveCredSpecContentsFunc(credSpecName)
+				return previousRetrieveCredSpecContentsFunc(ctx, credSpecName)
 			}
 
 			webhook := newWebhook(client)
 
 			setWindowsOptions(optionsSelector(pod), dummyCredSpecName, "")
 
-			response, err := webhook.mutateCreateRequest(pod)
+			response, err := webhook.mutateCreateRequest(context.Background(), pod)
 
 			assert.Nil(t, response)
 

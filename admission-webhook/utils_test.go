@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"math/rand"
 	"time"
 
@@ -17,21 +18,22 @@ const dummyPodName = "dummy-pod-name"
 const dummyContainerName = "dummy-container-name"
 
 type dummyKubeClient struct {
-	isAuthorizedToUseCredSpecFunc func(serviceAccountName, namespace, credSpecName string) (authorized bool, reason string)
-	retrieveCredSpecContentsFunc  func(credSpecName string) (contents string, httpCode int, err error)
+	isAuthorizedToUseCredSpecFunc func(ctx context.Context, serviceAccountName, namespace, credSpecName string) (authorized bool, reason string)
+	retrieveCredSpecContentsFunc  func(ctx context.Context, credSpecName string) (contents string, httpCode int, err error)
 }
 
-func (dkc *dummyKubeClient) isAuthorizedToUseCredSpec(serviceAccountName, namespace, credSpecName string) (authorized bool, reason string) {
+
+func (dkc *dummyKubeClient) isAuthorizedToUseCredSpec(ctx context.Context, serviceAccountName, namespace, credSpecName string) (authorized bool, reason string) {
 	if dkc.isAuthorizedToUseCredSpecFunc != nil {
-		return dkc.isAuthorizedToUseCredSpecFunc(serviceAccountName, namespace, credSpecName)
+		return dkc.isAuthorizedToUseCredSpecFunc(ctx, serviceAccountName, namespace, credSpecName)
 	}
 	authorized = true
 	return
 }
 
-func (dkc *dummyKubeClient) retrieveCredSpecContents(credSpecName string) (contents string, httpCode int, err error) {
+func (dkc *dummyKubeClient) retrieveCredSpecContents(ctx context.Context, credSpecName string) (contents string, httpCode int, err error) {
 	if dkc.retrieveCredSpecContentsFunc != nil {
-		return dkc.retrieveCredSpecContentsFunc(credSpecName)
+		return dkc.retrieveCredSpecContentsFunc(ctx, credSpecName)
 	}
 	contents = dummyCredSpecContents
 	return

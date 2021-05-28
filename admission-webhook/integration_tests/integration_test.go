@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -198,7 +199,7 @@ func TestCannotUpdateExistingPodLevelGMSASettings(t *testing.T) {
 	defer tearDownFunc()
 
 	// let's check that the pod has come up correctly, and has the correct GMSA cred inlined
-	pod, err := kubeClient(t).CoreV1().Pods(testConfig.Namespace).Get(testName, metav1.GetOptions{})
+	pod, err := kubeClient(t).CoreV1().Pods(testConfig.Namespace).Get(context.Background() ,testName, metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -228,7 +229,7 @@ func TestCannotUpdateExistingContainerLevelGMSASettings(t *testing.T) {
 	defer tearDownFunc()
 
 	// let's check that the pod has come up correctly, and has the correct GMSA cred inlined
-	pod, err := kubeClient(t).CoreV1().Pods(testConfig.Namespace).Get(testName, metav1.GetOptions{})
+	pod, err := kubeClient(t).CoreV1().Pods(testConfig.Namespace).Get(context.Background(), testName, metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -258,7 +259,7 @@ func TestPossibleToUpdatePodWithExistingGMSASettings(t *testing.T) {
 	defer tearDownFunc()
 
 	// let's check that the pod has come up correctly, and has the correct GMSA cred inlined
-	pod, err := kubeClient(t).CoreV1().Pods(testConfig.Namespace).Get(testName, metav1.GetOptions{})
+	pod, err := kubeClient(t).CoreV1().Pods(testConfig.Namespace).Get(context.Background(), testName, metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

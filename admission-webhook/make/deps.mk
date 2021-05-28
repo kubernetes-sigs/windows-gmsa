@@ -5,3 +5,7 @@ deps_install:
 .PHONY: deps_update
 deps_update:
 	go mod tidy
+
+.PHONY: deps_clean
+deps_clean:
+	rm -rf ./vendor

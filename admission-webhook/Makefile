@@ -48,4 +48,4 @@ clean_integration_tests:
 	rm -rf integration_tests/tmp
 
 .PHONY: clean
-clean: cluster_clean clean_integration_tests
+clean: cluster_clean clean_integration_tests deps_clean

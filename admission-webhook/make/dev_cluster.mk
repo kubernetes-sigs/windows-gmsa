@@ -44,6 +44,11 @@ cluster_start: $(KIND) $(KUBECTL)
 .PHONY: cluster_clean
 cluster_clean: $(KIND) clean_certs
 	$(KIND) delete cluster --name '$(CLUSTER_NAME)'
+	# also clean up any left over ci clusters from act
+	$(KIND) delete cluster --name 'windows-gmsa-deploy-method-download'
+	$(KIND) delete cluster --name 'windows-gmsa-dry-run-deploy'
+	$(KIND) delete cluster --name 'windows-gmsa-integration'
+	$(KIND) delete cluster --name 'windows-gmsa-tolerate-control-plane'
 
 .PHONY: clean_certs
 clean_certs:

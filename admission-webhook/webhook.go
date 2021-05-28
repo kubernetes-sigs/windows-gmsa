@@ -181,7 +181,7 @@ func (webhook *webhook) httpRequestToAdmissionResponse(request *http.Request, op
 		return deniedAdmissionResponse(fmt.Errorf("no 'Request' field in JSON body"), http.StatusBadRequest)
 	}
 
-	admissionResponse, admissionError := webhook.validateOrMutate(admissionReview.Request, operation)
+	admissionResponse, admissionError := webhook.validateOrMutate(request.Context(), admissionReview.Request, operation)
 	if admissionError != nil {
 		admissionResponse = deniedAdmissionResponse(admissionError)
 	}
@@ -193,7 +193,7 @@ func (webhook *webhook) httpRequestToAdmissionResponse(request *http.Request, op
 }
 
 // validateOrMutate is where the non-HTTP-related work happens.
-func (webhook *webhook) validateOrMutate(request *admissionv1beta1.AdmissionRequest, operation webhookOperation) (*admissionv1beta1.AdmissionResponse, *podAdmissionError) {
+func (webhook *webhook) validateOrMutate(ctx context.Context, request *admissionv1beta1.AdmissionRequest, operation webhookOperation) (*admissionv1beta1.AdmissionResponse, *podAdmissionError) {
 	if request.Kind.Kind != "Pod" {
 		return nil, &podAdmissionError{error: fmt.Errorf("expected a Pod object, got a %v", request.Kind.Kind), code: http.StatusBadRequest}
 	}
@@ -207,9 +207,9 @@ func (webhook *webhook) validateOrMutate(request *admissionv1beta1.AdmissionRequ
 	case admissionv1beta1.Create:
 		switch operation {
 		case validate:
-			return webhook.validateCreateRequest(pod, request.Namespace)
+			return webhook.validateCreateRequest(ctx, pod, request.Namespace)
 		case mutate:
-			return webhook.mutateCreateRequest(pod)
+			return webhook.mutateCreateRequest(ctx, pod)
 		default:
 			// shouldn't happen, but needed so that all paths in the function have a return value
 			panic(fmt.Errorf("unexpected webhook operation: %v", operation))
@@ -244,11 +244,11 @@ func unmarshallPod(object runtime.RawExtension) (*corev1.Pod, *podAdmissionError
 // validateCreateRequest ensures that the GMSA contents set in the pod's spec
 // match the corresponding GMSA names, and that the pod's service account
 // is authorized to `use` the requested GMSA's.
-func (webhook *webhook) validateCreateRequest(pod *corev1.Pod, namespace string) (*admissionv1beta1.AdmissionResponse, *podAdmissionError) {
+func (webhook *webhook) validateCreateRequest(ctx context.Context, pod *corev1.Pod, namespace string) (*admissionv1beta1.AdmissionResponse, *podAdmissionError) {
 	if err := iterateOverWindowsSecurityOptions(pod, func(windowsOptions *corev1.WindowsSecurityContextOptions, resourceKind gmsaResourceKind, resourceName string, _ int) *podAdmissionError {
 		if credSpecName := windowsOptions.GMSACredentialSpecName; credSpecName != nil {
 			// let's check that the associated service account can read the relevant cred spec CRD
-			if authorized, reason := webhook.client.isAuthorizedToUseCredSpec(pod.Spec.ServiceAccountName, namespace, *credSpecName); !authorized {
+			if authorized, reason := webhook.client.isAuthorizedToUseCredSpec(ctx, pod.Spec.ServiceAccountName, namespace, *credSpecName); !authorized {
 				msg := fmt.Sprintf("service account %q is not authorized to `use` GMSA cred spec %q", pod.Spec.ServiceAccountName, *credSpecName)
 				if reason != "" {
 					msg += fmt.Sprintf(", reason: %q", reason)
@@ -258,7 +258,7 @@ func (webhook *webhook) validateCreateRequest(pod *corev1.Pod, namespace string)
 
 			// and the contents should match the ones contained in the GMSA resource with that name
 			if credSpecContents := windowsOptions.GMSACredentialSpec; credSpecContents != nil {
-				if expectedContents, code, retrieveErr := webhook.client.retrieveCredSpecContents(*credSpecName); retrieveErr != nil {
+				if expectedContents, code, retrieveErr := webhook.client.retrieveCredSpecContents(ctx, *credSpecName); retrieveErr != nil {
 					return &podAdmissionError{error: retrieveErr, pod: pod, code: code}
 				} else if specsEqual, compareErr := compareCredSpecContents(*credSpecContents, expectedContents); !specsEqual || compareErr != nil {
 					msg := fmt.Sprintf("the GMSA cred spec contents for %s %q does not match the contents of GMSA resource %q", resourceKind, resourceName, *credSpecName)
@@ -307,7 +307,7 @@ func compareCredSpecContents(fromResource, fromCRD string) (bool, error) {
 }
 
 // mutateCreateRequest inlines the requested GMSA's into the pod's and containers' `WindowsSecurityOptions` structs.
-func (webhook *webhook) mutateCreateRequest(pod *corev1.Pod) (*admissionv1beta1.AdmissionResponse, *podAdmissionError) {
+func (webhook *webhook) mutateCreateRequest(ctx context.Context, pod *corev1.Pod) (*admissionv1beta1.AdmissionResponse, *podAdmissionError) {
 	var patches []map[string]string
 
 	if err := iterateOverWindowsSecurityOptions(pod, func(windowsOptions *corev1.WindowsSecurityContextOptions, resourceKind gmsaResourceKind, resourceName string, containerIndex int) *podAdmissionError {
@@ -315,7 +315,7 @@ func (webhook *webhook) mutateCreateRequest(pod *corev1.Pod) (*admissionv1beta1.
 			// if the user has pre-set the GMSA's contents, we won't override it - it'll be down
 			// to the validation endpoint to make sure the contents actually are what they should
 			if credSpecContents := windowsOptions.GMSACredentialSpec; credSpecContents == nil {
-				contents, code, retrieveErr := webhook.client.retrieveCredSpecContents(*credSpecName)
+				contents, code, retrieveErr := webhook.client.retrieveCredSpecContents(ctx, *credSpecName)
 				if retrieveErr != nil {
 					return &podAdmissionError{error: retrieveErr, pod: pod, code: code}
 				}
