@@ -31,13 +31,16 @@ run_integration_tests() {
     if [[ "$DEPLOY_METHOD" == 'download' ]]; then
         export K8S_GMSA_DEPLOY_METHOD='download'
 
-        if [ "$TRAVIS_COMMIT" ] && [ "$TRAVIS_PULL_REQUEST_SHA" ]; then
-            # it's a pull request
-            export K8S_GMSA_DEPLOY_DOWNLOAD_REPO="$TRAVIS_PULL_REQUEST_SLUG"
-            export K8S_GMSA_DEPLOY_DOWNLOAD_REV="$TRAVIS_PULL_REQUEST_SHA"
+        if [ "GITHUB_HEAD_REF" ]; then
+            # GITHUB_HEAD_REF is only set if it's a pull request
+            export K8S_GMSA_DEPLOY_DOWNLOAD_REPO="$GITHUB_REPOSITORY"
+            export K8S_GMSA_DEPLOY_DOWNLOAD_REV="$GITHUB_SHA"
+            echo "Running pull request: $K8S_GMSA_DEPLOY_DOWNLOAD_REPO $K8S_GMSA_DEPLOY_DOWNLOAD_REV"
         else
             # not a pull request
+            export K8S_GMSA_DEPLOY_DOWNLOAD_REPO="kubernetes-sigs/windows-gmsa"
             export K8S_GMSA_DEPLOY_DOWNLOAD_REV="$(git rev-parse HEAD)"
+            echo "Running: $K8S_GMSA_DEPLOY_DOWNLOAD_REPO $K8S_GMSA_DEPLOY_DOWNLOAD_REV"
         fi
     fi
 
