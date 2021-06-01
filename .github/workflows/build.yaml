@@ -17,7 +17,7 @@ jobs:
       uses: actions/setup-go@v2
       with:
         go-version: 1.16
-    - id: foo
+    - id: test-runner
       uses: ./.github/actions/tests
       env:
         T: unit
@@ -29,7 +29,7 @@ jobs:
       uses: actions/setup-go@v2
       with:
         go-version: 1.16
-    - id: foo
+    - id: test-runner
       uses: ./.github/actions/tests
       env:
         T: integration
@@ -41,7 +41,7 @@ jobs:
       uses: actions/setup-go@v2
       with:
         go-version: 1.16
-    - id: foo
+    - id: test-runner
       uses: ./.github/actions/tests
       env:
         T: integration
@@ -54,7 +54,7 @@ jobs:
       uses: actions/setup-go@v2
       with:
         go-version: 1.16
-    - id: foo
+    - id: test-runner
       uses: ./.github/actions/tests
       env:
         T: integration
@@ -68,7 +68,20 @@ jobs:
       uses: actions/setup-go@v2
       with:
         go-version: 1.16
-    - id: foo
+    - id: test-runner
       uses: ./.github/actions/tests
       env:
         T: dry_run_deploy
+  without-envsubst:
+    runs-on: ubuntu-18.04
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: 1.16
+    - id: test-runner
+      uses: ./.github/actions/tests
+      env:
+        T: integration
+        WITHOUT_ENVSUBST: 1

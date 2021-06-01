@@ -24,7 +24,8 @@ main() {
 }
 
 run_integration_tests() {
-    if [ "$WITHOUT_ENVSUBST" ] && [ -x "$(command -v envsubst)" ] && [[ "$TRAVIS" == "true" ]]; then
+    if [ "$WITHOUT_ENVSUBST" ] && [ -x "$(command -v envsubst)" ] && [[ "$GITHUB_ACTIONS" == "true" ]]; then
+        echo "Removing envsubst"
         sudo rm -f "$(command -v envsubst)"
     fi
 
