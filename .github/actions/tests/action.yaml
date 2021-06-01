@@ -4,7 +4,10 @@ runs:
   steps:
     - name: install envsub
       shell: bash
-      run: sudo apt-get update && sudo apt-get -y install gettext-base
+      run: |
+        if [ ! "$WITHOUT_ENVSUBST" ] && [ ! -x "$(command -v envsubst)" ]; then
+          sudo apt-get update && sudo apt-get -y install gettext-base
+        fi
     - name: run tests
       shell: bash
       run: |

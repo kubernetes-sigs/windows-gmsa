@@ -64,7 +64,15 @@ write_manifests_file() {
     local MANIFESTS_FILE="$2"
 
     if [ -x "$(command -v envsubst)" ] && [ ! "$WITHOUT_ENVSUBST" ]; then
+        echo "using local envsubst"
         envsubst < "$TEMPLATE_PATH" > "$MANIFESTS_FILE"
+    elif [ -x "$(command -v docker)" ]; then
+        echo "using envsubst in docker"
+        TMP_FILE=$(mktemp)
+        trap "rm -f $TMP_FILE" EXIT
+        env > "$TMP_FILE"
+        # envsubst is installed in the nginx images which we already maintain
+        docker run --rm -v "$TEMPLATE_PATH:$TEMPLATE_PATH" --env-file $TMP_FILE k8s.gcr.io/e2e-test-images/nginx:1.15-1 sh -c "cat $TEMPLATE_PATH | envsubst" > $MANIFESTS_FILE
     else
         fatal_error "Unable to run envsubst"
     fi
