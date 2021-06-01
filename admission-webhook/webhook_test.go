@@ -9,7 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+	admissionV1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -227,7 +227,7 @@ func TestMutateCreateRequest(t *testing.T) {
 			assert.True(t, response.Allowed)
 
 			if assert.NotNil(t, response.PatchType) {
-				assert.Equal(t, admissionv1beta1.PatchTypeJSONPatch, *response.PatchType)
+				assert.Equal(t, admissionV1.PatchTypeJSONPatch, *response.PatchType)
 			}
 
 			patchPath := func(kind gmsaResourceKind, name string) string {
