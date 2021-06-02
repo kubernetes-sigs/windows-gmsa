@@ -22,7 +22,7 @@ usage: $0 --file MANIFESTS_FILE [--name NAME] [--namespace NAMESPACE] [--image I
 MANIFESTS_FILE is the path to the file the k8s manifests will be written to.
 NAME defaults to 'gmsa-webhook' and is used in the names of most of the k8s resources created.
 NAMESPACE is the namespace to deploy to; defaults to 'gmsa-webhook'.
-IMAGE_NAME is the name of the Docker image containing the webhook; defaults to 'wk88/k8s-gmsa-webhook:latest' (FIXME: figure out a better way to distribute this image)
+IMAGE_NAME is the name of the Docker image containing the webhook; defaults to 'sigwindowstools/k8s-gmsa-webhook:latest'
 CERTS_DIR defaults to 'gmsa-webhook-certs'
 
 If --dry-run is set, the script echoes what command it would perform
@@ -82,7 +82,7 @@ main() {
     local MANIFESTS_FILE=
     local NAME='gmsa-webhook'
     local NAMESPACE='gmsa-webhook'
-    local IMAGE_NAME='wk88/k8s-gmsa-webhook:latest'
+    local IMAGE_NAME='sigwindowstools/k8s-gmsa-webhook:latest'
     local CERTS_DIR='gmsa-webhook-certs'
     local DRY_RUN=false
     local OVERWRITE=false
