@@ -4,8 +4,9 @@ SHELL := /bin/bash
 WEBHOOK_ROOT := $(CURDIR)
 
 DEV_IMAGE_NAME = k8s-windows-gmsa-webhook-dev
-# FIXME: find a better way to distribute/publish this image
-IMAGE_NAME = wk88/k8s-gmsa-webhook:latest
+VERSION = $(shell git describe --tags --always `git rev-parse HEAD`)
+IMAGE_REPO = sigwindowstools/k8s-gmsa-webhook
+IMAGE_NAME = $(IMAGE_REPO):$(VERSION)
 
 CURL = $(shell which curl 2> /dev/null)
 WGET = $(shell which wget 2> /dev/null)

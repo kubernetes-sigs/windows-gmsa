@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+	admissionV1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -133,7 +133,13 @@ func (webhook *webhook) ServeHTTP(responseWriter http.ResponseWriter, request *h
 	}
 
 	admissionResponse := webhook.httpRequestToAdmissionResponse(request, operation)
-	responseAdmissionReview := admissionv1beta1.AdmissionReview{Response: admissionResponse}
+	responseAdmissionReview := admissionV1.AdmissionReview{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "AdmissionReview",
+			APIVersion: "admission.k8s.io/v1",
+		},
+		Response: admissionResponse,
+	}
 
 	writeJSONBody(responseWriter, responseAdmissionReview)
 }
@@ -159,7 +165,7 @@ func writeJSONBody(responseWriter http.ResponseWriter, jsonBody interface{}) {
 }
 
 // httpRequestToAdmissionResponse turns a raw HTTP request into an AdmissionResponse struct.
-func (webhook *webhook) httpRequestToAdmissionResponse(request *http.Request, operation webhookOperation) *admissionv1beta1.AdmissionResponse {
+func (webhook *webhook) httpRequestToAdmissionResponse(request *http.Request, operation webhookOperation) *admissionV1.AdmissionResponse {
 	// read the body
 	if request.Body == nil {
 		deniedAdmissionResponse(fmt.Errorf("no request body"), http.StatusBadRequest)
@@ -173,7 +179,7 @@ func (webhook *webhook) httpRequestToAdmissionResponse(request *http.Request, op
 	logrus.Debugf("handling %s request: %s", operation, body)
 
 	// unmarshall the request
-	admissionReview := admissionv1beta1.AdmissionReview{}
+	admissionReview := admissionV1.AdmissionReview{}
 	if err = json.Unmarshal(body, &admissionReview); err != nil {
 		return deniedAdmissionResponse(fmt.Errorf("unable to unmarshall JSON body as an admission review: %v", err), http.StatusBadRequest)
 	}
@@ -193,7 +199,7 @@ func (webhook *webhook) httpRequestToAdmissionResponse(request *http.Request, op
 }
 
 // validateOrMutate is where the non-HTTP-related work happens.
-func (webhook *webhook) validateOrMutate(ctx context.Context, request *admissionv1beta1.AdmissionRequest, operation webhookOperation) (*admissionv1beta1.AdmissionResponse, *podAdmissionError) {
+func (webhook *webhook) validateOrMutate(ctx context.Context, request *admissionV1.AdmissionRequest, operation webhookOperation) (*admissionV1.AdmissionResponse, *podAdmissionError) {
 	if request.Kind.Kind != "Pod" {
 		return nil, &podAdmissionError{error: fmt.Errorf("expected a Pod object, got a %v", request.Kind.Kind), code: http.StatusBadRequest}
 	}
@@ -204,7 +210,7 @@ func (webhook *webhook) validateOrMutate(ctx context.Context, request *admission
 	}
 
 	switch request.Operation {
-	case admissionv1beta1.Create:
+	case admissionV1.Create:
 		switch operation {
 		case validate:
 			return webhook.validateCreateRequest(ctx, pod, request.Namespace)
@@ -215,7 +221,7 @@ func (webhook *webhook) validateOrMutate(ctx context.Context, request *admission
 			panic(fmt.Errorf("unexpected webhook operation: %v", operation))
 		}
 
-	case admissionv1beta1.Update:
+	case admissionV1.Update:
 		if operation == validate {
 			oldPod, err := unmarshallPod(request.OldObject)
 			if err != nil {
@@ -225,7 +231,7 @@ func (webhook *webhook) validateOrMutate(ctx context.Context, request *admission
 		}
 
 		// we only do validation on updates, no mutation
-		return &admissionv1beta1.AdmissionResponse{Allowed: true}, nil
+		return &admissionV1.AdmissionResponse{Allowed: true}, nil
 	default:
 		return nil, &podAdmissionError{error: fmt.Errorf("unpexpected operation %s", request.Operation), pod: pod, code: http.StatusBadRequest}
 	}
@@ -244,7 +250,7 @@ func unmarshallPod(object runtime.RawExtension) (*corev1.Pod, *podAdmissionError
 // validateCreateRequest ensures that the GMSA contents set in the pod's spec
 // match the corresponding GMSA names, and that the pod's service account
 // is authorized to `use` the requested GMSA's.
-func (webhook *webhook) validateCreateRequest(ctx context.Context, pod *corev1.Pod, namespace string) (*admissionv1beta1.AdmissionResponse, *podAdmissionError) {
+func (webhook *webhook) validateCreateRequest(ctx context.Context, pod *corev1.Pod, namespace string) (*admissionV1.AdmissionResponse, *podAdmissionError) {
 	if err := iterateOverWindowsSecurityOptions(pod, func(windowsOptions *corev1.WindowsSecurityContextOptions, resourceKind gmsaResourceKind, resourceName string, _ int) *podAdmissionError {
 		if credSpecName := windowsOptions.GMSACredentialSpecName; credSpecName != nil {
 			// let's check that the associated service account can read the relevant cred spec CRD
@@ -279,7 +285,7 @@ func (webhook *webhook) validateCreateRequest(ctx context.Context, pod *corev1.P
 		return nil, err
 	}
 
-	return &admissionv1beta1.AdmissionResponse{Allowed: true}, nil
+	return &admissionV1.AdmissionResponse{Allowed: true}, nil
 }
 
 // compareCredSpecContents returns true iff the two strings represent the same credential spec contents.
@@ -307,7 +313,7 @@ func compareCredSpecContents(fromResource, fromCRD string) (bool, error) {
 }
 
 // mutateCreateRequest inlines the requested GMSA's into the pod's and containers' `WindowsSecurityOptions` structs.
-func (webhook *webhook) mutateCreateRequest(ctx context.Context, pod *corev1.Pod) (*admissionv1beta1.AdmissionResponse, *podAdmissionError) {
+func (webhook *webhook) mutateCreateRequest(ctx context.Context, pod *corev1.Pod) (*admissionV1.AdmissionResponse, *podAdmissionError) {
 	var patches []map[string]string
 
 	if err := iterateOverWindowsSecurityOptions(pod, func(windowsOptions *corev1.WindowsSecurityContextOptions, resourceKind gmsaResourceKind, resourceName string, containerIndex int) *podAdmissionError {
@@ -341,7 +347,7 @@ func (webhook *webhook) mutateCreateRequest(ctx context.Context, pod *corev1.Pod
 		return nil, err
 	}
 
-	admissionResponse := &admissionv1beta1.AdmissionResponse{Allowed: true}
+	admissionResponse := &admissionV1.AdmissionResponse{Allowed: true}
 
 	if len(patches) != 0 {
 		patchesBytes, err := json.Marshal(patches)
@@ -350,7 +356,7 @@ func (webhook *webhook) mutateCreateRequest(ctx context.Context, pod *corev1.Pod
 		}
 
 		admissionResponse.Patch = patchesBytes
-		patchType := admissionv1beta1.PatchTypeJSONPatch
+		patchType := admissionV1.PatchTypeJSONPatch
 		admissionResponse.PatchType = &patchType
 	}
 
@@ -358,7 +364,7 @@ func (webhook *webhook) mutateCreateRequest(ctx context.Context, pod *corev1.Pod
 }
 
 // validateUpdateRequest ensures that there are no updates to any of the GMSA names or contents.
-func validateUpdateRequest(pod, oldPod *corev1.Pod) (*admissionv1beta1.AdmissionResponse, *podAdmissionError) {
+func validateUpdateRequest(pod, oldPod *corev1.Pod) (*admissionV1.AdmissionResponse, *podAdmissionError) {
 	var oldPodContainerOptions map[string]*corev1.WindowsSecurityContextOptions
 
 	if err := iterateOverWindowsSecurityOptions(pod, func(windowsOptions *corev1.WindowsSecurityContextOptions, resourceKind gmsaResourceKind, resourceName string, _ int) *podAdmissionError {
@@ -405,7 +411,7 @@ func validateUpdateRequest(pod, oldPod *corev1.Pod) (*admissionv1beta1.Admission
 		return nil, err
 	}
 
-	return &admissionv1beta1.AdmissionResponse{Allowed: true}, nil
+	return &admissionV1.AdmissionResponse{Allowed: true}, nil
 }
 
 func equalStringPointers(s1, s2 *string) bool {
@@ -444,7 +450,7 @@ func iterateOverWindowsSecurityOptions(pod *corev1.Pod, f func(windowsOptions *c
 
 // deniedAdmissionResponse is a helper function to create an AdmissionResponse
 // with an embedded error.
-func deniedAdmissionResponse(err error, httpCode ...int) *admissionv1beta1.AdmissionResponse {
+func deniedAdmissionResponse(err error, httpCode ...int) *admissionV1.AdmissionResponse {
 	var code int
 	logMsg := "refusing to admit"
 
@@ -465,7 +471,7 @@ func deniedAdmissionResponse(err error, httpCode ...int) *admissionv1beta1.Admis
 
 	logrus.Infof("%s: %v", logMsg, err)
 
-	return &admissionv1beta1.AdmissionResponse{
+	return &admissionV1.AdmissionResponse{
 		Allowed: false,
 		Result: &metav1.Status{
 			Message: err.Error(),

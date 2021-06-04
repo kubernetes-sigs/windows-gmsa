@@ -13,7 +13,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+	admissionV1 "k8s.io/api/admission/v1"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,8 +28,8 @@ func TestHTTPWebhook(t *testing.T) {
 
 	pod := buildPod(dummyServiceAccoutName, buildWindowsOptions(dummyCredSpecName, ""), map[string]*corev1.WindowsSecurityContextOptions{"container-name": nil})
 
-	admissionRequest := &admissionv1beta1.AdmissionReview{
-		Request: &admissionv1beta1.AdmissionRequest{
+	admissionRequest := &admissionV1.AdmissionReview{
+		Request: &admissionV1.AdmissionRequest{
 			UID: requestUID,
 			Kind: metav1.GroupVersionKind{
 				Version: "v1",
@@ -40,7 +40,7 @@ func TestHTTPWebhook(t *testing.T) {
 				Resource: "pods",
 			},
 			Namespace: dummyNamespace,
-			Operation: admissionv1beta1.Create,
+			Operation: admissionV1.Create,
 			UserInfo: authenticationv1.UserInfo{
 				Username: "system:serviceaccount:kube-system:replicaset-controller",
 				UID:      "cb335ac0-34b4-11e9-9745-06da3a0adce4",
@@ -83,7 +83,7 @@ func TestHTTPWebhook(t *testing.T) {
 		assert.True(t, response.Response.Allowed)
 
 		if assert.NotNil(t, response.Response.PatchType) {
-			assert.Equal(t, admissionv1beta1.PatchTypeJSONPatch, *response.Response.PatchType)
+			assert.Equal(t, admissionV1.PatchTypeJSONPatch, *response.Response.PatchType)
 		}
 
 		var patches []map[string]string
@@ -190,7 +190,7 @@ func startHTTPServer(t *testing.T, kubeClient *dummyKubeClient) (int, func()) {
 	}
 }
 
-func makeHTTPRequest(t *testing.T, port int, method string, path string, admissionRequest *admissionv1beta1.AdmissionReview, headers ...string) (httpCode int, admissionResponse *admissionv1beta1.AdmissionReview) {
+func makeHTTPRequest(t *testing.T, port int, method string, path string, admissionRequest *admissionV1.AdmissionReview, headers ...string) (httpCode int, admissionResponse *admissionV1.AdmissionReview) {
 	require.Equal(t, 0, len(headers)%2, "header names and values should be provided in pairs")
 
 	reqBody, err := json.Marshal(admissionRequest)
@@ -217,7 +217,7 @@ func makeHTTPRequest(t *testing.T, port int, method string, path string, admissi
 	respBody, err := ioutil.ReadAll(resp.Body)
 	require.Nil(t, err)
 
-	admissionResponse = &admissionv1beta1.AdmissionReview{}
+	admissionResponse = &admissionV1.AdmissionReview{}
 	if err := json.Unmarshal(respBody, admissionResponse); err != nil {
 		admissionResponse = nil
 	}

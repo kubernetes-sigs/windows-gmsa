@@ -128,7 +128,7 @@ spec:
 
 ---
 
-apiVersion: admissionregistration.k8s.io/v1beta1
+apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
   name: ${NAME}
@@ -146,6 +146,8 @@ webhooks:
     apiVersions: ["*"]
     resources: ["pods"]
   failurePolicy: Fail
+  admissionReviewVersions: ["v1", "v1beta1"]
+  sideEffects: None
   # don't run on ${NAMESPACE}
   namespaceSelector:
     matchExpressions:
@@ -155,7 +157,7 @@ webhooks:
 
 ---
 
-apiVersion: admissionregistration.k8s.io/v1beta1
+apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
 metadata:
   name: ${NAME}
@@ -173,6 +175,8 @@ webhooks:
     apiVersions: ["*"]
     resources: ["pods"]
   failurePolicy: Fail
+  admissionReviewVersions: ["v1", "v1beta1"]
+  sideEffects: None
   # don't run on ${NAMESPACE}
   namespaceSelector:
     matchExpressions:

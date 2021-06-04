@@ -98,7 +98,7 @@ EOF
 gen_file gen_csr_conf "$CSR_CONF"
 
 SERVER_CSR="$CERTS_DIR/server.csr"
-gen_server_scr() { openssl req -new -key "$SERVER_KEY" -subj "/CN=$SERVICE.$NAMESPACE.svc" -out "$SERVER_CSR" -config "$CSR_CONF"; }
+gen_server_scr() { openssl req -new -key "$SERVER_KEY" -subj "/O=system:nodes/CN=system:node:$SERVICE.$NAMESPACE.svc" -out "$SERVER_CSR" -config "$CSR_CONF"; }
 gen_file gen_server_scr "$SERVER_CSR"
 
 CSR_NAME="$SERVICE.$NAMESPACE"
@@ -109,7 +109,7 @@ fi
 
 # create server cert/key CSR and send to k8s API
 CSR_CONTENTS=$(cat <<EOF
-apiVersion: certificates.k8s.io/v1beta1
+apiVersion: certificates.k8s.io/v1
 kind: CertificateSigningRequest
 metadata:
   name: $CSR_NAME
@@ -117,6 +117,7 @@ spec:
   groups:
   - system:authenticated
   request: $(cat "$SERVER_CSR" | base64 -w 0)
+  signerName: kubernetes.io/kubelet-serving
   usages:
   - digital signature
   - key encipherment
