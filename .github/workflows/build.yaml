@@ -85,3 +85,18 @@ jobs:
       env:
         T: integration
         WITHOUT_ENVSUBST: 1
+  without-envsubst-tolerations:
+    runs-on: ubuntu-18.04
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: 1.16
+    - id: test-runner
+      uses: ./.github/actions/tests
+      env:
+        T: integration
+        NUM_NODES: 0
+        WITHOUT_ENVSUBST: 1
+        EXTRA_GMSA_DEPLOY_ARGS: --tolerate-master

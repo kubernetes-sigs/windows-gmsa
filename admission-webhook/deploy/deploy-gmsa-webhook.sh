@@ -68,11 +68,13 @@ write_manifests_file() {
         envsubst < "$TEMPLATE_PATH" > "$MANIFESTS_FILE"
     elif [ -x "$(command -v docker)" ]; then
         echo "using envsubst in docker"
-        TMP_FILE=$(mktemp)
-        trap "rm -f $TMP_FILE" EXIT
-        env > "$TMP_FILE"
+        # due to a bug in --env-file convert varaibles we care about to -e parameters 
+        # The sed commands get only the env names before =, clean any white space, add -e to them, then make it all one line
+        # https://github.com/moby/moby/issues/12997#issuecomment-307665540
+        ENVS=`env | grep -E 'NAME|NAMESPACE|TLS|RBAC|TOLERATIONS|IMAGE|CA' | sed -n '/^[^\t]/s/=.*//p' | sed '/^$/d' | sed 's/^/-e /g' | tr '\n' ' '`
+
         # envsubst is installed in the nginx images which we already maintain
-        docker run --rm -v "$TEMPLATE_PATH:$TEMPLATE_PATH" --env-file $TMP_FILE k8s.gcr.io/e2e-test-images/nginx:1.15-1 sh -c "cat $TEMPLATE_PATH | envsubst" > $MANIFESTS_FILE
+        docker run --rm -v "$TEMPLATE_PATH:$TEMPLATE_PATH" $ENVS k8s.gcr.io/e2e-test-images/nginx:1.15-1 sh -c "cat $TEMPLATE_PATH | envsubst" > $MANIFESTS_FILE
     else
         fatal_error "Unable to run envsubst"
     fi
