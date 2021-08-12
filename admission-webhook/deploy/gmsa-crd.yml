@@ -9,6 +9,49 @@ spec:
   versions:
   - name: v1alpha1
     served: true
+    storage: false
+    deprecated: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          credspec:
+            description: GMSA Credential Spec
+            type: object
+            properties:
+              ActiveDirectoryConfig:
+                type: object
+                properties:
+                  GroupManagedServiceAccounts:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        Name:
+                          type: string
+                        Scope:
+                          type: string
+              CmsPlugins:
+                type: array
+                items:
+                  type: string
+              DomainJoinConfig:
+                type: object
+                properties:
+                  DnsName:
+                    type: string
+                  DnsTreeName:
+                    type: string
+                  Guid:
+                    type: string
+                  MachineAccountName:
+                    type: string
+                  NetBiosName:
+                    type: string
+                  Sid:
+                    type: string
+  - name: v1
+    served: true
     storage: true
     schema:
       openAPIV3Schema:
@@ -58,6 +101,8 @@ spec:
                     type: string
                   Sid:
                     type: string
+  conversion:
+    strategy: None
   names:
     kind: GMSACredentialSpec
     plural: gmsacredentialspecs

@@ -54,7 +54,7 @@ Remove-Item $dockerCredSpecPath
 
 # generate the k8s resource
 $resource = [ordered]@{
-    "apiVersion" = "windows.k8s.io/v1alpha1";
+    "apiVersion" = "windows.k8s.io/v1";
     "kind" = 'GMSACredentialSpec';
     "metadata" = @{
         "name" = $ResourceName

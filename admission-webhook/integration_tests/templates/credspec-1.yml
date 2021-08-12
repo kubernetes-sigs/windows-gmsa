@@ -1,4 +1,7 @@
 # a sample cred spec
+# Note: The apiVersion of this GMSACredentialSpec was intentionally left at windows.k8s.io/v1alpha1
+#   to provide validation for scenarios where users deploy v1alpha CRD objects to their cluster after
+#   updating the CRD definition to use windows.k8s.io/v1 as the storage version.
 
 apiVersion: windows.k8s.io/v1alpha1
 kind: GMSACredentialSpec

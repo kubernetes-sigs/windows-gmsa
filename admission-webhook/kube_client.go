@@ -18,7 +18,7 @@ import (
 const (
 	// these 3 constants are the coordinates of the Custom Resource Definition
 	crdAPIGroup     = "windows.k8s.io"
-	crdAPIVersion   = "v1alpha1"
+	crdAPIVersion   = "v1"
 	crdResourceName = "gmsacredentialspecs"
 
 	// crdContentsField is the single field that's expected to be defined in a GMSA CRD,
