@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 const (
@@ -29,6 +30,20 @@ const (
 
 	tmpRoot      = "tmp"
 	ymlExtension = ".yml"
+)
+
+var (
+	v1alpha1Resource = schema.GroupVersionResource{
+		Group:    "windows.k8s.io",
+		Version:  "v1alpha1",
+		Resource: "gmsacredentialspecs",
+	}
+
+	v1Resource = schema.GroupVersionResource{
+		Group:    "windows.k8s.io",
+		Version:  "v1",
+		Resource: "gmsacredentialspecs",
+	}
 )
 
 func TestHappyPathWithPodLevelCredSpec(t *testing.T) {
@@ -286,6 +301,68 @@ func TestPossibleToUpdatePodWithExistingGMSASettings(t *testing.T) {
 	renderedTemplate := renderTemplate(t, testConfig, singlePodTemplate)
 	success, _, _ := applyManifest(t, renderedTemplate)
 	assert.True(t, success)
+}
+
+func TestDeployV1Alpha1CredSpecGetAllVersions(t *testing.T) {
+	testName := "deploy-v1alpha1-credspec-get-all-versions"
+	credSpecTemplates := []string{"credspec-0", "credspec-1"}
+
+	testConfig, tearDownFunc := integrationTestSetup(t, testName, credSpecTemplates, nil)
+	defer tearDownFunc()
+
+	// ensure CredSpec specified v1 CRD
+	templatePath := renderTemplate(t, testConfig, "credspec-1")
+	b, err := ioutil.ReadFile(templatePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(b)
+	assert.Contains(t, s, "apiVersion: windows.k8s.io/v1alpha1\n")
+
+	client := dynamicClient(t)
+	resourceName := "deploy-v1alpha1-credspec-get-all-versions-cred-spec-1"
+	v1alpha1CredSpec, err := client.Resource(v1alpha1Resource).Get(context.TODO(), resourceName, metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	v1CredSpec, err := client.Resource(v1Resource).Get(context.TODO(), resourceName, metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, v1alpha1CredSpec.Object["credSpec"], v1CredSpec.Object["credSpec"])
+}
+
+func TestDeployV1CredSpecGetAllVersions(t *testing.T) {
+	testName := "deploy-v1-credspec-get-all-versions"
+	credSpecTemplates := []string{"credspec-0", "credspec-1"}
+
+	testConfig, tearDownFunc := integrationTestSetup(t, testName, credSpecTemplates, nil)
+	defer tearDownFunc()
+
+	// ensure CredSpec specified v1 CRD
+	templatePath := renderTemplate(t, testConfig, "credspec-0")
+	b, err := ioutil.ReadFile(templatePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(b)
+	assert.Contains(t, s, "apiVersion: windows.k8s.io/v1\n")
+
+	client := dynamicClient(t)
+	resourceName := "deploy-v1-credspec-get-all-versions-cred-spec-0"
+	v1alpha1CredSpec, err := client.Resource(v1alpha1Resource).Get(context.TODO(), resourceName, metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	v1CredSpec, err := client.Resource(v1Resource).Get(context.TODO(), resourceName, metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, v1alpha1CredSpec.Object["credSpec"], v1CredSpec.Object["credSpec"])
 }
 
 /* Helpers */

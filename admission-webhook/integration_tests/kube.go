@@ -12,11 +12,13 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-func kubeClient(t *testing.T) kubernetes.Interface {
+func clientConfig(t *testing.T) *rest.Config {
 	kubeConfigPath, err := homedir.Expand(kubeconfig())
 	if err != nil {
 		t.Fatal(err)
@@ -26,7 +28,22 @@ func kubeClient(t *testing.T) kubernetes.Interface {
 		t.Fatal(err)
 	}
 
+	return config
+}
+
+func kubeClient(t *testing.T) kubernetes.Interface {
+	config := clientConfig(t)
 	client, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return client
+}
+
+func dynamicClient(t *testing.T) dynamic.Interface {
+	config := clientConfig(t)
+	client, err := dynamic.NewForConfig(config)
 	if err != nil {
 		t.Fatal(err)
 	}
