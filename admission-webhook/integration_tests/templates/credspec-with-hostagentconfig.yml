@@ -1,0 +1,26 @@
+# a sample cred spec
+
+apiVersion: windows.k8s.io/v1alpha1
+kind: GMSACredentialSpec
+metadata:
+  name: {{ index .CredSpecNames 0 }}
+credspec:
+  ActiveDirectoryConfig:
+    GroupManagedServiceAccounts:
+    - Name: WebApplication2
+      Scope: CONTOSO
+    - Name: WebApplication2
+      Scope: contoso.com
+    HostAccountConfig:
+      PluginGUID: "{GDMA0342-266A-4D1P-831J-20990E82944F}"
+      PluginInput: "contoso.com:gmsaccg:<password>"
+      PortableCcgVersion: "1"
+  CmsPlugins:
+  - ActiveDirectory
+  DomainJoinConfig:
+    DnsName: contoso.com
+    DnsTreeName: contoso.com
+    Guid: 244818ae-87ca-4fcd-92ec-e79e5252348a
+    MachineAccountName: WebApplication2
+    NetBiosName: CONTOSO
+    Sid: S-1-5-21-2126729477-2524275714-3294792973

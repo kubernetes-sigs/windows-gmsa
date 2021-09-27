@@ -30,6 +30,15 @@ spec:
                           type: string
                         Scope:
                           type: string
+                  HostAccountConfig:
+                    type: object
+                    properties:
+                      PluginGUID:
+                        type: string
+                      PluginInput:
+                        type: string
+                      PortableCcgVersion:
+                        type: string
               CmsPlugins:
                 type: array
                 items:
