@@ -24,6 +24,8 @@ const (
 	expectedCredSpec1 = `{"ActiveDirectoryConfig":{"GroupManagedServiceAccounts":[{"Name":"WebApplication1","Scope":"CONTOSO"},{"Name":"WebApplication1","Scope":"contoso.com"}]},"CmsPlugins":["ActiveDirectory"],"DomainJoinConfig":{"DnsName":"contoso.com","DnsTreeName":"contoso.com","Guid":"244818ae-87ca-4fcd-92ec-e79e5252348a","MachineAccountName":"WebApplication1","NetBiosName":"CONTOSO","Sid":"S-1-5-21-2126729477-2524175714-3194792973"}}`
 	// this is the JSON representation of the cred spec from templates/credspec-2.yml
 	expectedCredSpec2 = `{"ActiveDirectoryConfig":{"GroupManagedServiceAccounts":[{"Name":"WebApplication2","Scope":"CONTOSO"},{"Name":"WebApplication2","Scope":"contoso.com"}]},"CmsPlugins":["ActiveDirectory"],"DomainJoinConfig":{"DnsName":"contoso.com","DnsTreeName":"contoso.com","Guid":"244818ae-87ca-4fcd-92ec-e79e5252348a","MachineAccountName":"WebApplication2","NetBiosName":"CONTOSO","Sid":"S-1-5-21-2126729477-2524275714-3294792973"}}`
+	// this is the JSON representation of the cred spec from templates/credspec-with-hostagentconfig.yml
+	expectedCredSpecWithHostAgentConfig = `{"ActiveDirectoryConfig":{"GroupManagedServiceAccounts":[{"Name":"WebApplication2","Scope":"CONTOSO"},{"Name":"WebApplication2","Scope":"contoso.com"}],"HostAccountConfig":{"PluginGUID":"{GDMA0342-266A-4D1P-831J-20990E82944F}","PluginInput":"contoso.com:gmsaccg:\u003cpassword\u003e","PortableCcgVersion":"1"}},"CmsPlugins":["ActiveDirectory"],"DomainJoinConfig":{"DnsName":"contoso.com","DnsTreeName":"contoso.com","Guid":"244818ae-87ca-4fcd-92ec-e79e5252348a","MachineAccountName":"WebApplication2","NetBiosName":"CONTOSO","Sid":"S-1-5-21-2126729477-2524275714-3294792973"}}`
 
 	tmpRoot      = "tmp"
 	ymlExtension = ".yml"
@@ -199,7 +201,7 @@ func TestCannotUpdateExistingPodLevelGMSASettings(t *testing.T) {
 	defer tearDownFunc()
 
 	// let's check that the pod has come up correctly, and has the correct GMSA cred inlined
-	pod, err := kubeClient(t).CoreV1().Pods(testConfig.Namespace).Get(context.Background() ,testName, metav1.GetOptions{})
+	pod, err := kubeClient(t).CoreV1().Pods(testConfig.Namespace).Get(context.Background(), testName, metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -247,6 +249,19 @@ func TestCannotUpdateExistingContainerLevelGMSASettings(t *testing.T) {
 	renderedTemplate = renderTemplate(t, testConfig, singlePodTemplate)
 	success, _, _ = applyManifest(t, renderedTemplate)
 	assert.False(t, success)
+}
+
+func TestHappyPathWithHostAgentConfigInCredSpec(t *testing.T) {
+	testName := "happy-path-with-pod-level-cred-spec"
+	credSpecTemplates := []string{"credspec-with-hostagentconfig"}
+	templates := []string{"credspecs-users-rbac-role", "service-account", "sa-rbac-binding", "simple-with-gmsa"}
+
+	testConfig, tearDownFunc := integrationTestSetup(t, testName, credSpecTemplates, templates)
+	defer tearDownFunc()
+
+	pod := waitForPodToComeUp(t, testConfig.Namespace, "app="+testName)
+
+	assert.Equal(t, expectedCredSpecWithHostAgentConfig, extractPodCredSpecContents(t, pod))
 }
 
 func TestPossibleToUpdatePodWithExistingGMSASettings(t *testing.T) {
