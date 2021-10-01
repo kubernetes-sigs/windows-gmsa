@@ -1,6 +1,6 @@
 # a sample cred spec
 
-apiVersion: windows.k8s.io/v1alpha1
+apiVersion: windows.k8s.io/v1
 kind: GMSACredentialSpec
 metadata:
   name: {{ index .CredSpecNames 0 }}
