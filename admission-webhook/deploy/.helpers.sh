@@ -48,7 +48,7 @@ echo_or_run() {
     if $DRY_RUN; then
         echo "$@"
         if $WITH_KUBECTL_DRY_RUN; then
-            eval "$@ --dry-run >&2"
+            eval "$@ --dry-run=client >&2"
         fi
     else
         eval "$@"
