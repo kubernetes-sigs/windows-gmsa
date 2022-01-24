@@ -1,0 +1,13 @@
+apiVersion: v2
+appVersion: 0.3.0
+description: Windows GMSA Configuration
+keywords:
+- Windows
+- Windows GMSA
+- GMSA
+- Active Directory
+name: gmsa
+sources:
+- https://github.com/kubernetes-sigs/windows-gmsa
+type: application
+version: 0.3.0

@@ -1,0 +1,21 @@
+apiVersion: v1
+entries:
+  gmsa:
+  - apiVersion: v2
+    appVersion: 0.3.0
+    created: "2022-02-06T13:46:51.4153248-05:00"
+    description: Windows GMSA Configuration
+    digest: 4e455b1af147cbf858def41ccd11bc74f43c324e7a9efd4fdc0dee9ff7cddb74
+    keywords:
+    - Windows
+    - Windows GMSA
+    - GMSA
+    - Active Directory
+    name: gmsa
+    sources:
+    - https://github.com/kubernetes-sigs/windows-gmsa
+    type: application
+    urls:
+    - https://raw.githubusercontent.com/kubernetes-sigs/windows-gmsa/master/charts/v0.3.0/gmsa-0.3.0.tgz
+    version: 0.3.0
+generated: "2022-02-06T13:46:51.413394-05:00"
