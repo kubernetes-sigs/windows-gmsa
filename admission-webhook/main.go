@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/sirupsen/logrus"
@@ -24,7 +25,12 @@ func main() {
 		keyPath: env("TLS_KEY"),
 	}
 
-	if err = webhook.start(443, tlsConfig, nil); err != nil {
+	port, err := port("HTTPS_PORT")
+	if err != nil {
+		panic(err)
+	}
+
+	if err = webhook.start(port, tlsConfig, nil); err != nil {
 		panic(err)
 	}
 }
@@ -81,4 +87,11 @@ func env(key string) string {
 		return value
 	}
 	panic(fmt.Errorf("%s env var not found", key))
+}
+
+func port(key string) (int, error) {
+	if port, found := os.LookupEnv(key); found {
+		return strconv.Atoi(port)
+	}
+	return 443, nil
 }
