@@ -62,7 +62,7 @@ deploy_dev_webhook:
 # deploys the webhook to the kind cluster with the release image
 .PHONY: deploy_webhook
 deploy_webhook:
-	K8S_GMSA_IMAGE=$(WEBHOOK_IMAGE) $(MAKE) _deploy_webhook
+	K8S_GMSA_IMAGE=$(WEBHOOK_IMG) $(MAKE) _deploy_webhook
 
 # removes the webhook from the kind cluster
 .PHONY: remove_webhook
