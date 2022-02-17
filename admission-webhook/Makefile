@@ -3,10 +3,10 @@ SHELL := /bin/bash
 
 WEBHOOK_ROOT := $(CURDIR)
 
-REGISTRY?=sigwindowstools
-STAGING_REGISTRY := gcr.io/k8s-staging-gmsa-webhook
+REGISTRY ?= sigwindowstools
+STAGING_REGISTRY ?= gcr.io/k8s-staging-gmsa-webhook
 IMAGE_NAME ?= k8s-gmsa-webhook
-TAG :=  $(shell git describe --tags --always `git rev-parse HEAD`)
+TAG ?=  $(shell git describe --tags --always `git rev-parse HEAD`)
 WEBHOOK_IMG ?= $(REGISTRY)/$(IMAGE_NAME)
 
 DEV_IMAGE_NAME = k8s-windows-gmsa-webhook-dev
