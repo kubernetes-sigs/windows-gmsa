@@ -16,7 +16,7 @@ steps:
     args:
     - -c
     - |
-      echo "Building / Pushing GMSA webhook container image with TAG=${TAG}, PULL_BASE_REF=${PULL_BASE_REF}"
+      echo "Building / Pushing GMSA webhook container"
       cd admission-webhook
       make release-staging
 substitutions:
