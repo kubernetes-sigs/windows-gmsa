@@ -6,7 +6,16 @@ The Kubernetes Windows GMSA project is released on an as-needed basis. The proce
 1. All [OWNERS](OWNERS) must LGTM this release issue
 1. An OWNER runs `git tag -s $VERSION` from `master` branch and pushes the tag with `git push $VERSION`
 1. An OWNER promotes the `gcr.io/k8s-staging-gmsa-webhook/k8s-gmsa-webhook` image built the tagged commit.
-    1. Insuctions TBD
+    1. Follow setup steps for `kpromo` from [here](https://github.com/kubernetes-sigs/promo-tools/blob/main/docs/promotion-pull-requests.md#preparing-environment) if needed
+    1. Manually tag the desired container image in the [staging registry](https://console.cloud.google.com/gcr/images/k8s-staging-gmsa-webhook/GLOBAL) as `$VERSION`
+    1. Run `kpromo pr` to open a pull request to have tagged container image promoted from staging to release registries
+
+        ```bash
+        kpromo pr --project gmsa-webhook --tag $VERSION --reviewers "@jayunit100 @jsturtevant @marosset" --fork {your github username}
+        ```
+
+    1. Review / merge image promotion PR
+
 1. An OWNER creates a release with by
     1. Navigating to [releases](https://github.com/kubernetes-sigs/windows-gmsa/releases) and clicking on `Draft a new release`
     1. Selecting the tag for the current release version
