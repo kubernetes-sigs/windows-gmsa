@@ -15,3 +15,7 @@ curl -sL https://raw.githubusercontent.com/kubernetes-sigs/windows-gmsa/master/a
 Run with the `--dry-run` option to not change anything to your cluster just yet and simply review the change it would be doing.
 
 Run with `--help` to see all the available options.
+
+### Amazon EKS
+
+If you are trying to install this into an EKS cluster please perform the additional installation steps found at https://github.com/aws-samples/amazon-eks-gmsa-admission-webhook-autoinstall
