@@ -32,7 +32,7 @@ run_integration_tests() {
     if [[ "$DEPLOY_METHOD" == 'download' ]]; then
         export K8S_GMSA_DEPLOY_METHOD='download'
 
-        if [ "GITHUB_HEAD_REF" ]; then
+        if [ "$GITHUB_HEAD_REF" ]; then
             # GITHUB_HEAD_REF is only set if it's a pull request
             export K8S_GMSA_DEPLOY_DOWNLOAD_REPO="$GITHUB_REPOSITORY"
             export K8S_GMSA_DEPLOY_DOWNLOAD_REV="$GITHUB_SHA"
@@ -44,6 +44,24 @@ run_integration_tests() {
             echo "Running: $K8S_GMSA_DEPLOY_DOWNLOAD_REPO $K8S_GMSA_DEPLOY_DOWNLOAD_REV"
         fi
     fi
+
+    if [[ "$DEPLOY_METHOD" == 'chart' ]]; then
+       export K8S_GMSA_DEPLOY_METHOD='chart'
+
+       if [ "$GITHUB_HEAD_REF" ]; then
+           # GITHUB_HEAD_REF is only set if it's a pull request
+           # Similar logic goes here, but installs the chart using the repo.
+           export K8S_GMSA_DEPLOY_DOWNLOAD_REPO="$GITHUB_REPOSITORY"
+           export K8S_GMSA_DEPLOY_DOWNLOAD_REV="$GITHUB_SHA"
+           echo "Running pull request: $K8S_GMSA_DEPLOY_DOWNLOAD_REPO $K8S_GMSA_DEPLOY_DOWNLOAD_REV"
+       else
+           # not a pull request
+           # Installs the chart using the local copy.
+           export K8S_GMSA_DEPLOY_DOWNLOAD_REPO="kubernetes-sigs/windows-gmsa"
+           export K8S_GMSA_DEPLOY_DOWNLOAD_REV="$(git rev-parse HEAD)"
+           echo "Running: $K8S_GMSA_DEPLOY_DOWNLOAD_REPO $K8S_GMSA_DEPLOY_DOWNLOAD_REV"
+       fi
+   fi
 
     export DEPLOYMENT_NAME=windows-gmsa-dev
     export NAMESPACE=windows-gmsa-dev
