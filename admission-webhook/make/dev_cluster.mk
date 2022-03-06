@@ -3,6 +3,8 @@
 KUBERNETES_VERSION ?= 1.21.1
 # see https://github.com/kubernetes-sigs/kind/releases
 KIND_VERSION = 0.11.0
+# https://github.com/helm/helm/releases
+HELM_VERSION ?= 3.8.0
 
 CLUSTER_NAME ?= windows-gmsa-dev
 DEPLOYMENT_NAME ?= windows-gmsa-dev
@@ -22,6 +24,13 @@ KUBECTL_URL = https://storage.googleapis.com/kubernetes-release/release/v$(KUBER
 
 ifeq ($(KUBECTL),)
 KUBECTL = $(DEV_DIR)/kubectl-$(KUBERNETES_VERSION)
+endif
+
+HELM = $(shell which helm 2> /dev/null)
+HELM_URL = https://get.helm.sh/helm-v$(HELM_VERSION)-$(UNAME)-amd64.tar.gz
+
+ifeq ($(HELM),)
+HELM = $(DEV_DIR)/HELM-$(HELM_VERSION)
 endif
 
 KUBECONFIG = ~/.kube/kind-config-$(CLUSTER_NAME)

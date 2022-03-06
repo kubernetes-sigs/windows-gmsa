@@ -4,29 +4,25 @@ install-helm:
 
 .PHONY: helm-chart
 helm-chart:
-	helm package ../charts/$(VERSION)/gmsa -d ../charts/$(VERSION)
+	$(HELM) package ../charts/$(VERSION)/gmsa -d ../charts/$(VERSION)
 
 .PHONY: helm-index
 helm-index:
-	helm repo index ../charts
+	$(HELM) repo index ../charts
 
 .PHONY: helm-lint
 helm-lint:
-	helm lint ../charts/$(VERSION)/gmsa
+	$(HELM) lint ../charts/$(VERSION)/gmsa
 
 # deploys the chart to the kind cluster with the release image
 .PHONY: deploy_chart
 deploy_chart:
-	K8S_GMSA_IMAGE=$(IMAGE_NAME) $(MAKE) _deploy_webhook
+	$(MAKE) _deploy_chart
 
 # removes the chart from the kind cluster
 .PHONY: remove_chart
-remove_chart	:
-ifeq ($(wildcard $(MANIFESTS_FILE)),)
-	@ echo "No manifests file found at $(MANIFESTS_FILE), nothing to remove"
-else
-	KUBECONFIG=$(KUBECONFIG) $(KUBECTL) delete -f $(MANIFESTS_FILE) || true
-endif
+remove_chart:
+	KUBECONFIG=$(KUBECONFIG) $(HELM) uninstall $(DEPLOYMENT_NAME)
 
 # deploys the webhook to the kind cluster using helm
 # if $K8S_GMSA_DEPLOY_METHOD is set to "download", then it will deploy by downloading
@@ -46,5 +42,5 @@ ifeq ($(K8S_GMSA_DEPLOY_METHOD),download)
       && CMD="curl -sL 'https://raw.githubusercontent.com/$$K8S_GMSA_DEPLOY_DOWNLOAD_REPO/$$K8S_GMSA_DEPLOY_DOWNLOAD_REV/admission-webhook/deploy/deploy-gmsa-webhook.sh' | K8S_GMSA_DEPLOY_DOWNLOAD_REPO='$$K8S_GMSA_DEPLOY_DOWNLOAD_REPO' K8S_GMSA_DEPLOY_DOWNLOAD_REV='$$K8S_GMSA_DEPLOY_DOWNLOAD_REV' KUBECONFIG=$(KUBECONFIG) KUBECTL=$(KUBECTL) bash -s -- --file '$(MANIFESTS_FILE)' --name '$(DEPLOYMENT_NAME)' --namespace '$(NAMESPACE)' --image '$(K8S_GMSA_IMAGE)' --certs-dir '$(CERTS_DIR)' $(EXTRA_GMSA_DEPLOY_ARGS)" \
       && echo "$$CMD" && eval "$$CMD"
 else
-	KUBECONFIG=$(KUBECONFIG) KUBECTL=$(KUBECTL) ./deploy/deploy-gmsa-webhook.sh --file "$(MANIFESTS_FILE)" --name "$(DEPLOYMENT_NAME)" --namespace "$(NAMESPACE)" --image "$(K8S_GMSA_IMAGE)" --certs-dir "$(CERTS_DIR)" $(EXTRA_GMSA_DEPLOY_ARGS)
+    KUBECONFIG=$(KUBECONFIG) $(HELM) install $(DEPLOYMENT_NAME)
 endif
