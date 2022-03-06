@@ -28,7 +28,7 @@ webhooks:
     # don't run on ${NAMESPACE}
     namespaceSelector:
       matchExpressions:
-        - key: gmsa-webhook
+        - key: {{ .Release.Namespace }}
           operator: NotIn
           values: [disabled]
 
