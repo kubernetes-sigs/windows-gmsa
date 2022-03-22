@@ -29,6 +29,9 @@ run_integration_tests() {
         sudo rm -f "$(command -v envsubst)"
     fi
 
+    export DEPLOYMENT_NAME=windows-gmsa-dev
+    export NAMESPACE=windows-gmsa-dev
+
     if [[ "$DEPLOY_METHOD" == 'download' ]]; then
         export K8S_GMSA_DEPLOY_METHOD='download'
 
@@ -60,12 +63,14 @@ run_integration_tests() {
            export K8S_GMSA_DEPLOY_DOWNLOAD_REPO="kubernetes-sigs/windows-gmsa"
            export K8S_GMSA_DEPLOY_DOWNLOAD_REV="$(git rev-parse HEAD)"
            echo "Running: $K8S_GMSA_DEPLOY_DOWNLOAD_REPO $K8S_GMSA_DEPLOY_DOWNLOAD_REV"
+           
+           export K8S_GMSA_CHART=$GITHUB_WORKSPACE/charts/v0.3.0/gmsa
+           make integration_tests_chart
+           exit 
        fi
-   fi
+    fi
 
-    export DEPLOYMENT_NAME=windows-gmsa-dev
-    export NAMESPACE=windows-gmsa-dev
-
+    
     if [ "$WITH_DEV_IMAGE" ]; then
         make integration_tests_with_dev_image
 

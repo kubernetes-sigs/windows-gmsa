@@ -1,6 +1,6 @@
 # K8S version can be overriden
 # see available versions at https://hub.docker.com/r/kindest/node/tags
-KUBERNETES_VERSION ?= 1.21.1
+KUBERNETES_VERSION ?= 1.23.4
 # see https://github.com/kubernetes-sigs/kind/releases
 KIND_VERSION = 0.11.0
 # https://github.com/helm/helm/releases
@@ -26,14 +26,7 @@ ifeq ($(KUBECTL),)
 KUBECTL = $(DEV_DIR)/kubectl-$(KUBERNETES_VERSION)
 endif
 
-HELM = $(shell which helm 2> /dev/null)
-HELM_URL = https://get.helm.sh/helm-v$(HELM_VERSION)-$(UNAME)-amd64.tar.gz
-
-ifeq ($(HELM),)
-HELM = $(DEV_DIR)/HELM-$(HELM_VERSION)
-endif
-
-KUBECONFIG = ~/.kube/kind-config-$(CLUSTER_NAME)
+KUBECONFIG?="~/.kube/kind-config-$(CLUSTER_NAME)"
 
 # starts a new kind cluster (see https://github.com/kubernetes-sigs/kind)
 .PHONY: cluster_start

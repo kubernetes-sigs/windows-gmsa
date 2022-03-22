@@ -1,3 +1,10 @@
+HELM = $(shell which helm 2> /dev/null)
+HELM_URL = https://get.helm.sh/helm-v$(HELM_VERSION)-$(UNAME)-amd64.tar.gz
+
+ifeq ($(HELM),)
+HELM = $(DEV_DIR)/HELM-$(HELM_VERSION)
+endif
+
 .PHONY: install-helm
 install-helm:
 	curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
@@ -16,8 +23,8 @@ helm-lint:
 
 # deploys the chart to the kind cluster with the release image
 .PHONY: deploy_chart
-deploy_chart:
-	$(MAKE) _deploy_chart
+deploy_chart: install-helm
+	K8S_GMSA_IMAGE=$(IMAGE_NAME) $(MAKE) _deploy_chart
 
 # removes the chart from the kind cluster
 .PHONY: remove_chart
@@ -30,17 +37,21 @@ remove_chart:
 # $K8S_GMSA_DEPLOY_CHART_VERSION env variables to build the download URL. If VERSION is
 # not set then latest is used.
 .PHONY: _deploy_chart
-_deploy_chart: remove_chart
+_deploy_chart:  _deploy_certmanager
 ifeq ($(K8S_GMSA_CHART),)
 	@ echo "Cannot call target $@ without setting K8S_GMSA_CHART"
 	exit 1
 endif
 	mkdir -p $(dir $(MANIFESTS_FILE))
-ifeq ($(K8S_GMSA_DEPLOY_METHOD),download)
-	@if [ ! "$$K8S_GMSA_DEPLOY_DOWNLOAD_REPO" ]; then K8S_GMSA_DEPLOY_DOWNLOAD_REPO="kubernetes-sigs/windows-gmsa"; fi \
-      && if [ ! "$$K8S_GMSA_DEPLOY_DOWNLOAD_REV" ]; then K8S_GMSA_DEPLOY_DOWNLOAD_REV="$$(git rev-parse HEAD)"; fi \
-      && CMD="curl -sL 'https://raw.githubusercontent.com/$$K8S_GMSA_DEPLOY_DOWNLOAD_REPO/$$K8S_GMSA_DEPLOY_DOWNLOAD_REV/admission-webhook/deploy/deploy-gmsa-webhook.sh' | K8S_GMSA_DEPLOY_DOWNLOAD_REPO='$$K8S_GMSA_DEPLOY_DOWNLOAD_REPO' K8S_GMSA_DEPLOY_DOWNLOAD_REV='$$K8S_GMSA_DEPLOY_DOWNLOAD_REV' KUBECONFIG=$(KUBECONFIG) KUBECTL=$(KUBECTL) bash -s -- --file '$(MANIFESTS_FILE)' --name '$(DEPLOYMENT_NAME)' --namespace '$(NAMESPACE)' --image '$(K8S_GMSA_IMAGE)' --certs-dir '$(CERTS_DIR)' $(EXTRA_GMSA_DEPLOY_ARGS)" \
-      && echo "$$CMD" && eval "$$CMD"
-else
-    KUBECONFIG=$(KUBECONFIG) $(HELM) install $(DEPLOYMENT_NAME)
-endif
+	@ echo "installing helm deployment $(DEPLOYMENT_NAME) with chart $(K8S_GMSA_CHART) and image $(IMAGE_REPO):$(VERSION)"
+	KUBECONFIG=$(KUBECONFIG) $(HELM) version
+	KUBECONFIG=$(KUBECONFIG) $(HELM) install $(DEPLOYMENT_NAME) --set image.repository=$(IMAGE_REPO) --set image.tag=$(VERSION) $(K8S_GMSA_CHART)
+
+.PHONY: _deploy_certmanager
+_deploy_certmanager: remove_certmanager
+	KUBECONFIG=$(KUBECONFIG) $(KUBECTL) create namespace cert-manager
+	KUBECONFIG=$(KUBECONFIG) $(KUBECTL) apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.7.1/cert-manager.yaml
+
+.PHONY: remove_certmanager
+remove_certmanager:
+	KUBECONFIG=$(KUBECONFIG) $(KUBECTL) delete namespace cert-manager || true

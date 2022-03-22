@@ -2,14 +2,14 @@ certificates:
   certManager:
     # Enable cert manager integration. Cert manager should be already installed at the k8s cluster
     enabled: true
-    version: ""
+    version: "v1.7.1"
   # If cert-manager integration is disabled, add self-signed ca.crt in base64 format
   caBundle: ""
   # If cert-manager integration is disabled, upload certs data (ca.crt, tls.crt and tls.key) as k8s secretName in the namespace
   secretName: gmsa-server-cert
 
 credential:
-  enabled: true
+  enabled: false
   domainJoinConfig:
     dnsName: ""  #DNS Domain Name
     dnsTreeName: "" #DNS Domain Name Root
@@ -18,7 +18,7 @@ credential:
     netBiosName: ""  #NETBIOS Domain Name
     sid: "" #SID of GMSA
 
-containerPort: 443
+containerPort: "443"
 
 image:
   repository: sigwindowstools/k8s-gmsa-webhook
