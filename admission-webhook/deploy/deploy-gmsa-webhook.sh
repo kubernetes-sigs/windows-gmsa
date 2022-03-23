@@ -170,9 +170,21 @@ main() {
         effect: NoSchedule'
     fi
 
+    if [ -f "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt" ]; then
+        info 'using pod based authentication'
+        BUNDLE=$(cat /var/run/secrets/kubernetes.io/serviceaccount/ca.crt | base64 | tr -d '\n')
+    else
+        info 'using config file authentication'
+        BUNDLE=$($KUBECTL config view --raw --minify --flatten -o jsonpath='{.clusters[].cluster.certificate-authority-data}')
+    fi
+
+    if [[ -z "$BUNDLE" ]]; then
+        fatal_error "Not able to determine CA bundle for depoloyment"
+    fi
+
     TLS_PRIVATE_KEY=$(cat "$SERVER_KEY" | base64 -w 0) \
         TLS_CERTIFICATE="$TLS_CERTIFICATE" \
-        CA_BUNDLE="$($KUBECTL config view --raw --minify --flatten -o jsonpath='{.clusters[].cluster.certificate-authority-data}')" \
+        CA_BUNDLE="$BUNDLE" \
         RBAC_ROLE_NAME="$NAMESPACE-$NAME-rbac-role" \
         NAME="$NAME" \
         NAMESPACE="$NAMESPACE" \
