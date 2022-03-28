@@ -12,7 +12,7 @@ jobs:
   unit:
     runs-on: ubuntu-18.04
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: Set up Go
       uses: actions/setup-go@v2
       with:
@@ -24,7 +24,9 @@ jobs:
   integration:
     runs-on: ubuntu-18.04
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0 # fetch all tags so we can get latest release without hardcoding it
     - name: Set up Go
       uses: actions/setup-go@v2
       with:
@@ -36,7 +38,9 @@ jobs:
   deploy-method-download:
     runs-on: ubuntu-18.04
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0 # fetch all tags so we can get latest release without hardcoding it
     - name: Set up Go
       uses: actions/setup-go@v2
       with:
@@ -49,7 +53,9 @@ jobs:
   tolerate-control-plane:
     runs-on: ubuntu-18.04
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0 # fetch all tags so we can get latest release without hardcoding it
     - name: Set up Go
       uses: actions/setup-go@v2
       with:
@@ -75,7 +81,9 @@ jobs:
   without-envsubst:
     runs-on: ubuntu-18.04
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0 # fetch all tags so we can get latest release without hardcoding it
     - name: Set up Go
       uses: actions/setup-go@v2
       with:
@@ -88,7 +96,9 @@ jobs:
   without-envsubst-tolerations:
     runs-on: ubuntu-18.04
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0 # fetch all tags so we can get latest release without hardcoding it
     - name: Set up Go
       uses: actions/setup-go@v2
       with:

@@ -3,11 +3,13 @@ SHELL := /bin/bash
 
 WEBHOOK_ROOT := $(CURDIR)
 
-REGISTRY ?= sigwindowstools
 STAGING_REGISTRY ?= gcr.io/k8s-staging-gmsa-webhook
 IMAGE_NAME ?= k8s-gmsa-webhook
 TAG ?=  $(shell git describe --tags --always `git rev-parse HEAD`)
-WEBHOOK_IMG ?= $(REGISTRY)/$(IMAGE_NAME)
+WEBHOOK_IMG ?= $(STAGING_REGISTRY)/$(IMAGE_NAME)
+
+LATEST_RELEASE ?= $(shell git describe --tags --abbrev=0)
+PROD_IMG = k8s.gcr.io/gmsa-webhook/k8s-gmsa-webhook:$(LATEST_RELEASE)
 
 DEV_IMAGE_NAME = k8s-windows-gmsa-webhook-dev
 
@@ -56,4 +58,4 @@ clean: cluster_clean clean_integration_tests deps_clean
 
 .PHONY: release-staging 
 release-staging: ## Builds and push webhook image to k8s-staging bucket
-	REGISTRY=$(STAGING_REGISTRY) $(MAKE) image_build image_push
+	$(MAKE) image_build image_push
