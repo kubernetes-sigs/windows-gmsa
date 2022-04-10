@@ -2,10 +2,10 @@ apiVersion: v1
 entries:
   gmsa:
   - apiVersion: v2
-    appVersion: 0.3.0
-    created: "2022-02-06T13:46:51.4153248-05:00"
+    appVersion: 0.4.0
+    created: "2022-04-10T13:16:01.700697-04:00"
     description: Windows GMSA Configuration
-    digest: 4e455b1af147cbf858def41ccd11bc74f43c324e7a9efd4fdc0dee9ff7cddb74
+    digest: 7f29d22ba85d90a18e5b9c4e1a7d9ba1149d5827a2ca37b9a6fe1966e3598767
     keywords:
     - Windows
     - Windows GMSA
@@ -16,6 +16,6 @@ entries:
     - https://github.com/kubernetes-sigs/windows-gmsa
     type: application
     urls:
-    - https://raw.githubusercontent.com/kubernetes-sigs/windows-gmsa/master/charts/v0.3.0/gmsa-0.3.0.tgz
-    version: 0.3.0
-generated: "2022-02-06T13:46:51.413394-05:00"
+    - v0.4.0/gmsa-0.4.0.tgz
+    version: 0.4.0
+generated: "2022-04-10T13:16:01.700137-04:00"

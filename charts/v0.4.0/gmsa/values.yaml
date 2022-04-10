@@ -21,8 +21,8 @@ credential:
 containerPort: "443"
 
 image:
-  repository: sigwindowstools/k8s-gmsa-webhook
-  tag: v0.3.0
+  repository: k8s.gcr.io/gmsa-webhook/k8s-gmsa-webhook
+  tag: v0.4.0
   imagePullPolicy: IfNotPresent
 
 global:
