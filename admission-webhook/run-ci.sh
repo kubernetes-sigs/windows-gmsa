@@ -64,7 +64,7 @@ run_integration_tests() {
            export K8S_GMSA_DEPLOY_DOWNLOAD_REV="$(git rev-parse HEAD)"
            echo "Running: $K8S_GMSA_DEPLOY_DOWNLOAD_REPO $K8S_GMSA_DEPLOY_DOWNLOAD_REV"
            
-           export K8S_GMSA_CHART=$GITHUB_WORKSPACE/charts/v0.3.0/gmsa
+           export K8S_GMSA_CHART=$GITHUB_WORKSPACE/charts/v0.4.0/gmsa
            make integration_tests_chart
            exit 
        fi
