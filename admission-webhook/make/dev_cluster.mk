@@ -39,8 +39,8 @@ cluster_start: $(KIND) $(KUBECTL)
 	KUBECONFIG=$(KUBECONFIG) $(KUBECTL) delete -n kube-system deployment.apps/coredns || true
 	# kind removes the taint on master when NUM_NODES is 0 - but we do want to test that case too!
 	KUBECONFIG=$(KUBECONFIG) $(KUBECTL) taint node $(CLUSTER_NAME)-control-plane 'node-role.kubernetes.io/master=true:NoSchedule' --overwrite
-	@ echo -e 'Cluster started, KUBECONFIG available at $(KUBECONFIG), eg\nexport KUBECONFIG=$(KUBECONFIG)'
-	@ $(MAKE) cluster_symlinks
+	#@ echo -e 'Cluster started, KUBECONFIG available at $(KUBECONFIG), eg\nexport KUBECONFIG=$(KUBECONFIG)'
+	#@ $(MAKE) cluster_symlinks
 
 # removes the kind cluster
 .PHONY: cluster_clean
