@@ -1,8 +1,10 @@
 # K8S version can be overriden
 # see available versions at https://hub.docker.com/r/kindest/node/tags
-KUBERNETES_VERSION ?= 1.21.1
+KUBERNETES_VERSION ?= 1.23.4
 # see https://github.com/kubernetes-sigs/kind/releases
-KIND_VERSION = 0.11.0
+KIND_VERSION = 0.12.0
+# https://github.com/helm/helm/releases
+HELM_VERSION ?= 3.8.0
 
 CLUSTER_NAME ?= windows-gmsa-dev
 DEPLOYMENT_NAME ?= windows-gmsa-dev
@@ -24,7 +26,7 @@ ifeq ($(KUBECTL),)
 KUBECTL = $(DEV_DIR)/kubectl-$(KUBERNETES_VERSION)
 endif
 
-KUBECONFIG = ~/.kube/kind-config-$(CLUSTER_NAME)
+KUBECONFIG?="~/.kube/kind-config-$(CLUSTER_NAME)"
 
 # starts a new kind cluster (see https://github.com/kubernetes-sigs/kind)
 .PHONY: cluster_start
@@ -37,8 +39,8 @@ cluster_start: $(KIND) $(KUBECTL)
 	KUBECONFIG=$(KUBECONFIG) $(KUBECTL) delete -n kube-system deployment.apps/coredns || true
 	# kind removes the taint on master when NUM_NODES is 0 - but we do want to test that case too!
 	KUBECONFIG=$(KUBECONFIG) $(KUBECTL) taint node $(CLUSTER_NAME)-control-plane 'node-role.kubernetes.io/master=true:NoSchedule' --overwrite
-	@ echo -e 'Cluster started, KUBECONFIG available at $(KUBECONFIG), eg\nexport KUBECONFIG=$(KUBECONFIG)'
-	@ $(MAKE) cluster_symlinks
+	#@ echo -e 'Cluster started, KUBECONFIG available at $(KUBECONFIG), eg\nexport KUBECONFIG=$(KUBECONFIG)'
+	#@ $(MAKE) cluster_symlinks
 
 # removes the kind cluster
 .PHONY: cluster_clean

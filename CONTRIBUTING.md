@@ -16,6 +16,13 @@ If your repo has certain guidelines for contribution, put them here ahead of the
 - [Kubernetes Contributor Guide](http://git.k8s.io/community/contributors/guide) - Main contributor documentation, or you can just jump directly to the [contributing section](http://git.k8s.io/community/contributors/guide#contributing)
 - [Contributor Cheat Sheet](https://git.k8s.io/community/contributors/guide/contributor-cheatsheet.md) - Common resources for existing developers
 
+## Generating Helm Charts and Index
+
+When a chart needs to be updated, create the new version and the chart information. Run helm pack, then generate a new Helm chart index.yaml with the following command.
+
+```Bash
+helm repo index --url https://raw.githubusercontent.com/kubernetes-sigs/windows-gmsa/master/charts .
+```
 ## Mentorship
 
 - [Mentoring Initiatives](https://git.k8s.io/community/mentoring) - We have a diverse set of mentorship programs available that are always looking for volunteers!

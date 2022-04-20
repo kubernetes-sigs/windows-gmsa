@@ -100,3 +100,16 @@ jobs:
         NUM_NODES: 0
         WITHOUT_ENVSUBST: 1
         EXTRA_GMSA_DEPLOY_ARGS: --tolerate-master
+  chart-integration:
+    runs-on: ubuntu-18.04
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: 1.17
+    - id: test-runner
+      uses: ./.github/actions/tests
+      env:
+        T: integration
+        DEPLOY_METHOD: chart

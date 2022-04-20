@@ -37,6 +37,9 @@ unit_tests:
 .PHONY: integration_tests
 integration_tests: image_build deploy_webhook run_integration_tests
 
+.PHONY: integration_tests_chart
+integration_tests_chart: image_build deploy_chart run_integration_tests
+
 .PHONY: integration_tests_with_dev_image
 integration_tests_with_dev_image: image_build_dev deploy_dev_webhook run_integration_tests
 

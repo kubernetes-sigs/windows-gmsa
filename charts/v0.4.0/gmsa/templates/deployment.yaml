@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name}}
+  namespace: {{.Release.Namespace}}
+  labels: {{ include "gmsa.chartref" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}
+    spec:
+      {{- if .Values.podSecurityContext }}
+      securityContext: {{ toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ .Release.Name }}
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/os
+                    operator: In
+                    values:
+                      - linux
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ .Release.Name }}
+          image: '{{ template "system_default_registry" . }}{{ .Values.image.repository }}:{{ .Values.image.tag }}'
+          imagePullPolicy: {{ .Values.image.imagePullPolicy }}
+          readinessProbe:
+            httpGet:
+              scheme: HTTPS
+              path: /health
+              port: {{ .Values.containerPort }}
+          ports:
+            - containerPort: {{ .Values.containerPort }}
+          volumeMounts:
+          {{- if eq .Values.certificates.certManager.enabled false }}
+            - name: tls
+              mountPath: "/tls"
+              readOnly: true
+          {{- end }}
+          env:
+            - name: TLS_KEY
+              value: /tls/key
+            - name: TLS_CRT
+              value: /tls/crt
+            - name: HTTPS_PORT
+              value: "{{ .Values.containerPort }}"
+      {{- if .Values.securityContext }}
+      securityContext: {{ toYaml .Values.securityContext | nindent 12 }}
+      {{- end }}
+      {{- if eq .Values.certificates.certManager.enabled false }}
+      volumes:
+        - name: tls
+          secret:
+            secretName: {{ .Values.certificates.secretName }}
+            items:
+              - key: tls.key
+                path: key
+              - key: tls.crt
+                path: crt
+      {{- end }}
+
