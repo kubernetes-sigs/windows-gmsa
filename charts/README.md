@@ -8,7 +8,7 @@
 
 ### install a specific version
 ```console
-helm repo add windows-gmsa https://raw.githubusercontent.com/windows-gmsa/gmsa/master/charts
+helm repo add windows-gmsa https://raw.githubusercontent.com/kubernetes-sigs/windows-gmsa/master/charts
 helm install windows-gmsa/gmsa --namespace kube-system --version v0.3.0
 ```
 
