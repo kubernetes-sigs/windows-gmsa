@@ -8,8 +8,8 @@
 
 ### install a specific version
 ```console
-helm repo add windows-gmsa https://raw.githubusercontent.com/kubernetes-sigs/windows-gmsa/master/charts
-helm install windows-gmsa/gmsa --namespace kube-system --version v0.3.0
+helm repo add windows-gmsa https://raw.githubusercontent.com/kubernetes-sigs/windows-gmsa/master/charts/repo
+helm install windows-gmsa/gmsa --namespace kube-system --version v0.4.1
 ```
 
 ### search for all available chart versions
@@ -39,8 +39,8 @@ The following table lists the configurable parameters of the latest GMSA chart a
 | `credential.domainJoinConfig.machineAccountName`      | username of the GMSA account                                      |                                                       |
 | `credential.domainJoinConfig.netBiosName`             | NETBIOS Domain Name                                               |                                                       |
 | `credential.domainJoinConfig.sid`                     | SID                                                               |                                                       |
-| `image.repository`                                    | image repository                                                  | `sigwindowstools/k8s-gmsa-webhook`                    |
-| `image.tag`                                           | image tag                                                         | `v0.3.0`                                              |
+| `image.repository`                                    | image repository                                                  | `k8s.gcr.io/gmsa-webhook/k8s-gmsa-webhook`                    |
+| `image.tag`                                           | image tag                                                         | `v0.4.0`                                              |
 | `image.imagePullPolicy`                               | image pull policy                                                 | `IfNotPresent`                                        |
 | `global.systemDefaultRegistry `                       | container registry                                                |                                                       |
 | `tolerations`                                         | tolerations                                                       | []                                                    |
