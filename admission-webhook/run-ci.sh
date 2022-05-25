@@ -10,6 +10,8 @@ export CLUSTER_NAME="windows-gmsa-$GITHUB_JOB"
 export KUBECTL="$GITHUB_WORKSPACE/admission-webhook/dev/kubectl-$CLUSTER_NAME"
 export KUBECONFIG="$GITHUB_WORKSPACE/admission-webhook/dev/kubeconfig-$CLUSTER_NAME"
 
+export K8S_GMSA_CHART="$GITHUB_WORKSPACE/charts/gmsa"
+
 main() {
     case "$T" in
         unit)
@@ -46,11 +48,9 @@ run_integration_tests() {
             export K8S_GMSA_DEPLOY_DOWNLOAD_REV="$(git rev-parse HEAD)"
             echo "Running: $K8S_GMSA_DEPLOY_DOWNLOAD_REPO $K8S_GMSA_DEPLOY_DOWNLOAD_REV"
         fi
-    fi
-
-    if [[ "$DEPLOY_METHOD" == 'chart' ]]; then
+    elif [[ "$DEPLOY_METHOD" == 'chart' ]]; then
        export K8S_GMSA_DEPLOY_METHOD='chart'
-
+       echo "deploy method: $K8S_GMSA_DEPLOY_METHOD"
        if [ "$GITHUB_HEAD_REF" ]; then
            # GITHUB_HEAD_REF is only set if it's a pull request
            # Similar logic goes here, but installs the chart using the repo.
@@ -63,10 +63,6 @@ run_integration_tests() {
            export K8S_GMSA_DEPLOY_DOWNLOAD_REPO="kubernetes-sigs/windows-gmsa"
            export K8S_GMSA_DEPLOY_DOWNLOAD_REV="$(git rev-parse HEAD)"
            echo "Running: $K8S_GMSA_DEPLOY_DOWNLOAD_REPO $K8S_GMSA_DEPLOY_DOWNLOAD_REV"
-           
-           export K8S_GMSA_CHART=$GITHUB_WORKSPACE/charts/v0.4.0/gmsa
-           make integration_tests_chart
-           exit 
        fi
     fi
 
@@ -95,7 +91,12 @@ run_integration_tests() {
             exit 1
         fi
     else
-        make integration_tests
+        if [[ "$DEPLOY_METHOD" == 'download' ]]; then
+            make integration_tests
+        fi
+        if [[ "$DEPLOY_METHOD" == 'chart' ]]; then
+            make integration_tests_chart
+        fi
     fi
 }
 

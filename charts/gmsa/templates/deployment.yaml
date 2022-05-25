@@ -43,11 +43,9 @@ spec:
           ports:
             - containerPort: {{ .Values.containerPort }}
           volumeMounts:
-          {{- if eq .Values.certificates.certManager.enabled false }}
             - name: tls
               mountPath: "/tls"
               readOnly: true
-          {{- end }}
           env:
             - name: TLS_KEY
               value: /tls/key
@@ -58,7 +56,6 @@ spec:
       {{- if .Values.securityContext }}
       securityContext: {{ toYaml .Values.securityContext | nindent 12 }}
       {{- end }}
-      {{- if eq .Values.certificates.certManager.enabled false }}
       volumes:
         - name: tls
           secret:
@@ -68,5 +65,4 @@ spec:
                 path: key
               - key: tls.crt
                 path: crt
-      {{- end }}
 
