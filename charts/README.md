@@ -9,7 +9,7 @@
 ### install a specific version
 ```console
 helm repo add windows-gmsa https://raw.githubusercontent.com/kubernetes-sigs/windows-gmsa/master/charts/repo
-helm install windows-gmsa/gmsa --namespace kube-system --version v0.4.1
+helm install windows-gmsa/gmsa --namespace kube-system --version v0.4.2
 ```
 
 ### search for all available chart versions
