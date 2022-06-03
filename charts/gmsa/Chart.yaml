@@ -10,4 +10,4 @@ name: gmsa
 sources:
 - https://github.com/kubernetes-sigs/windows-gmsa
 type: application
-version: 0.4.1
+version: 0.4.2
