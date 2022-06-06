@@ -74,7 +74,7 @@ write_manifests_file() {
         ENVS=`env | grep -E 'NAME|NAMESPACE|TLS|RBAC|TOLERATIONS|IMAGE|CA' | sed -n '/^[^\t]/s/=.*//p' | sed '/^$/d' | sed 's/^/-e /g' | tr '\n' ' '`
 
         # envsubst is installed in the nginx images which we already maintain
-        docker run --rm -v "$TEMPLATE_PATH:$TEMPLATE_PATH" $ENVS k8s.gcr.io/e2e-test-images/nginx:1.15-1 sh -c "cat $TEMPLATE_PATH | envsubst" > $MANIFESTS_FILE
+        docker run --rm -v "$TEMPLATE_PATH:$TEMPLATE_PATH" $ENVS registry.k8s.io/e2e-test-images/nginx:1.15-1 sh -c "cat $TEMPLATE_PATH | envsubst" > $MANIFESTS_FILE
     else
         fatal_error "Unable to run envsubst"
     fi

@@ -19,7 +19,7 @@ spec:
     spec:
       serviceAccountName: {{ .ServiceAccountName }}
       containers:
-      - image: k8s.gcr.io/pause
+      - image: registry.k8s.io/pause
         name: nginx
         securityContext:
           windowsOptions:

@@ -22,14 +22,14 @@ spec:
         windowsOptions:
           gmsaCredentialSpecName: {{ index .CredSpecNames 1 }}
       containers:
-      - image: k8s.gcr.io/pause
+      - image: registry.k8s.io/pause
         name: nginx0
         securityContext:
           windowsOptions:
             gmsaCredentialSpecName: {{ index .CredSpecNames 0 }}
-      - image: k8s.gcr.io/pause
+      - image: registry.k8s.io/pause
         name: nginx1
-      - image: k8s.gcr.io/pause
+      - image: registry.k8s.io/pause
         name: nginx2
         securityContext:
           windowsOptions:

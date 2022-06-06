@@ -28,9 +28,9 @@ The Kubernetes Windows GMSA project is released on an as-needed basis. The proce
         ```bash
         K8S_GMSA_DEPLOY_DOWNLOAD_REV='$VERSION' \
             ./deploy-gmsa-webhook.sh --file ./gmsa-manifests \
-            --image k8s.gcr.io/gmsa-webhook/k8s-gmsa-webhook:$VERSION
+            --image registry.k8s.io/gmsa-webhook/k8s-gmsa-webhook:$VERSION
         ```
-        
+
     1. Clicking on `Publish Release`
 1. The release issue is closed
 1. An announcement email is sent to `kubernetes-sig-windows@googlegroups.com` with the subject `[ANNOUNCE] Kubernetes SIG-Windows GMSA Webhook $VERSION is Released`
