@@ -22,7 +22,7 @@ spec:
         windowsOptions:
           gmsaCredentialSpecName: {{ index .CredSpecNames 0 }}
       containers:
-      - image: k8s.gcr.io/pause
+      - image: registry.k8s.io/pause
         name: nginx
 {{- range $line := .ExtraSpecLines }}
       {{ $line }}

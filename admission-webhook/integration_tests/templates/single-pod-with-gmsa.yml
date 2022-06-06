@@ -20,7 +20,7 @@ spec:
 {{- if .Image }}
     image: {{ .Image }}
 {{- else }}
-    image: k8s.gcr.io/pause
+    image: registry.k8s.io/pause
 {{- end }}
   dnsPolicy: ClusterFirst
   restartPolicy: Never
