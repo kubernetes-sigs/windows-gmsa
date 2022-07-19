@@ -65,4 +65,8 @@ spec:
                 path: key
               - key: tls.crt
                 path: crt
+      {{- if and (.Values.setPodOs) (ge .Capabilities.KubeVersion.Minor "24")}}
+      os:
+        name: linux
+      {{- end -}}
 

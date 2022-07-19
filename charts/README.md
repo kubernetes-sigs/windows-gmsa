@@ -10,7 +10,7 @@
 
 ```console
 helm repo add windows-gmsa https://raw.githubusercontent.com/kubernetes-sigs/windows-gmsa/master/charts/repo
-helm install windows-gmsa/gmsa --namespace kube-system --version v0.4.2
+helm install windows-gmsa/gmsa --namespace kube-system --version v0.4.4
 ```
 
 ### search for all available chart versions
@@ -47,6 +47,7 @@ The following table lists the configurable parameters of the latest GMSA chart a
 | `image.imagePullPolicy`                               | image pull policy                                                 | `IfNotPresent`                                        |
 | `global.systemDefaultRegistry`                        | container registry                                                |                                                       |
 | `tolerations`                                         | tolerations                                                       | []                                                    |
+! `setPodOs`                                            | Enables setting of `OS` field on Pod for supported K8s versions   | `true`                                                |
 
 ## troubleshooting
 
