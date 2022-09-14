@@ -31,7 +31,15 @@ setPodOs: ture
 global:
   systemDefaultRegistry: ""
 
+affinity: {}
+nodeselector: {}
+podDisruptionBudget:
+  enabled: false
+  # minAvailable: 1
+  # maxUnavailable: 1
+
 podSecurityContext: {}
+replicaCount: 2
 securityContext: {}
 tolerations: []
 
