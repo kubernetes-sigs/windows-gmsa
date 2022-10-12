@@ -28,7 +28,10 @@ webhooks:
     # don't run on ${NAMESPACE}
     namespaceSelector:
       matchExpressions:
-        - key: {{ .Release.Namespace }}
+        - key: kubernetes.io/metadata.name
           operator: NotIn
-          values: [disabled]
+          values: [{{ .Release.Namespace }}]
+        - key: windows.k8s.io/disabled
+          operator: NotIn
+          values: ["true"]
 
