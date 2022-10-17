@@ -3,7 +3,24 @@ entries:
   gmsa:
   - apiVersion: v2
     appVersion: 0.4.0
-    created: "2022-09-13T21:57:51.527971-04:00"
+    created: "2022-10-17T12:52:15.283789-04:00"
+    description: Windows GMSA Configuration
+    digest: b637cee6f623598cca5611c3854514875ce1363d915ad8cdd4dabd8d96483546
+    keywords:
+    - Windows
+    - Windows GMSA
+    - GMSA
+    - Active Directory
+    name: gmsa
+    sources:
+    - https://github.com/kubernetes-sigs/windows-gmsa
+    type: application
+    urls:
+    - gmsa-0.6.0.tgz
+    version: 0.6.0
+  - apiVersion: v2
+    appVersion: 0.4.0
+    created: "2022-10-17T12:52:15.283217-04:00"
     description: Windows GMSA Configuration
     digest: 19003bcc3f5af484afd5a9ad0c833a861420daf7e50964563ecaf92e4a1dc35c
     keywords:
@@ -20,7 +37,7 @@ entries:
     version: 0.5.0
   - apiVersion: v2
     appVersion: 0.4.0
-    created: "2022-09-13T21:57:51.527486-04:00"
+    created: "2022-10-17T12:52:15.281344-04:00"
     description: Windows GMSA Configuration
     digest: 1f6b8bbfe6af4088f80d08d3065094ab1504054526bea6e4477459fb738f504b
     keywords:
@@ -37,7 +54,24 @@ entries:
     version: 0.4.4
   - apiVersion: v2
     appVersion: 0.4.0
-    created: "2022-09-13T21:57:51.526874-04:00"
+    created: "2022-10-17T12:52:15.280724-04:00"
+    description: Windows GMSA Configuration
+    digest: 6ae2ac87141c8e3ac598611153635b0dd6619634ddc27b27b9c1a8717a511d8a
+    keywords:
+    - Windows
+    - Windows GMSA
+    - GMSA
+    - Active Directory
+    name: gmsa
+    sources:
+    - https://github.com/kubernetes-sigs/windows-gmsa
+    type: application
+    urls:
+    - gmsa-0.4.3.tgz
+    version: 0.4.3
+  - apiVersion: v2
+    appVersion: 0.4.0
+    created: "2022-10-17T12:52:15.280254-04:00"
     description: Windows GMSA Configuration
     digest: 399a4d03dfc08ac4cd811106ab55d525845ca715f0edbdcfcafcfa02cceaf108
     keywords:
@@ -54,7 +88,7 @@ entries:
     version: 0.4.2
   - apiVersion: v2
     appVersion: 0.4.0
-    created: "2022-09-13T21:57:51.526244-04:00"
+    created: "2022-10-17T12:52:15.279622-04:00"
     description: Windows GMSA Configuration
     digest: 0709c8666554bf7b521c003d33f6198dafe03bf883161e132e929dac478bda45
     keywords:
@@ -71,7 +105,7 @@ entries:
     version: 0.4.1
   - apiVersion: v2
     appVersion: 0.4.0
-    created: "2022-09-13T21:57:51.525622-04:00"
+    created: "2022-10-17T12:52:15.278934-04:00"
     description: Windows GMSA Configuration
     digest: 7f29d22ba85d90a18e5b9c4e1a7d9ba1149d5827a2ca37b9a6fe1966e3598767
     keywords:
@@ -86,4 +120,4 @@ entries:
     urls:
     - gmsa-0.4.0.tgz
     version: 0.4.0
-generated: "2022-09-13T21:57:51.524379-04:00"
+generated: "2022-10-17T12:52:15.278037-04:00"
