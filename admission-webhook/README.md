@@ -16,6 +16,6 @@ Run with the `--dry-run` option to not change anything to your cluster just yet 
 
 Run with `--help` to see all the available options.
 
-### Amazon EKS
+## Amazon EKS
 
-EKS cluster operators should follow the installation steps found at https://github.com/aws-samples/amazon-eks-gmsa-admission-webhook-autoinstall
+According to the Amazon EKS certificate signing documentation, all clusters running Amazon EKS version 1.22 or newer supports the following signer beta.eks.amazonaws.com/app-serving for Kubernetes Certificate Signing Requests (CSR) which is compatible with the latest gMSA admission webhook installation. As a result, we need to replace kubernetes.io/kubelet-serving signer in the gMSA Webhook create-signed-cert.sh file with the following signer : beta.eks.amazonaws.com/app-serving
