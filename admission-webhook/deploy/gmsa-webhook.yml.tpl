@@ -81,7 +81,7 @@ spec:
     spec:
       serviceAccountName: ${NAME}
       nodeSelector:
-        beta.kubernetes.io/os: linux${TOLERATIONS}
+        kubernetes.io/os: linux${TOLERATIONS}
       containers:
       - name: ${NAME}
         image: ${IMAGE_NAME}
