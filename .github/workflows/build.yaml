@@ -10,7 +10,7 @@ on:
 
 jobs:
   unit:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v2
     - name: Set up Go
@@ -22,7 +22,7 @@ jobs:
       env:
         T: unit
   integration:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v2
     - name: Set up Go
@@ -34,7 +34,7 @@ jobs:
       env:
         T: integration
   deploy-method-download:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v2
     - name: Set up Go
@@ -47,7 +47,7 @@ jobs:
         T: integration
         DEPLOY_METHOD: download
   tolerate-control-plane:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v2
     - name: Set up Go
@@ -61,7 +61,7 @@ jobs:
         NUM_NODES: 0
         EXTRA_GMSA_DEPLOY_ARGS: --tolerate-master
   dry-run-deploy:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v2
     - name: Set up Go
@@ -73,7 +73,7 @@ jobs:
       env:
         T: dry_run_deploy
   without-envsubst:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v2
     - name: Set up Go
@@ -86,7 +86,7 @@ jobs:
         T: integration
         WITHOUT_ENVSUBST: 1
   without-envsubst-tolerations:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v2
     - name: Set up Go
@@ -101,7 +101,7 @@ jobs:
         WITHOUT_ENVSUBST: 1
         EXTRA_GMSA_DEPLOY_ARGS: --tolerate-master
   chart-integration:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v2
     - name: Set up Go
