@@ -51,7 +51,7 @@ endif
 .PHONY: _deploy_certmanager
 _deploy_certmanager: remove_certmanager
 	KUBECONFIG=$(KUBECONFIG) $(KUBECTL) create namespace cert-manager
-	KUBECONFIG=$(KUBECONFIG) $(KUBECTL) apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.7.1/cert-manager.yaml
+	KUBECONFIG=$(KUBECONFIG) $(KUBECTL) apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.10.1/cert-manager.yaml
 	KUBECONFIG=$(KUBECONFIG) $(KUBECTL) wait -n cert-manager pod -l app=cainjector --for=condition=Ready
 	KUBECONFIG=$(KUBECONFIG) $(KUBECTL) wait -n cert-manager pod -l app=webhook --for=condition=Ready
 	
