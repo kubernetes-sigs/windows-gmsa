@@ -1,8 +1,8 @@
 # K8S version can be overriden
 # see available versions at https://hub.docker.com/r/kindest/node/tags
-KUBERNETES_VERSION ?= 1.23.4
+KUBERNETES_VERSION ?= 1.26.0
 # see https://github.com/kubernetes-sigs/kind/releases
-KIND_VERSION = 0.12.0
+KIND_VERSION = 0.17.0
 # https://github.com/helm/helm/releases
 HELM_VERSION ?= 3.8.0
 
