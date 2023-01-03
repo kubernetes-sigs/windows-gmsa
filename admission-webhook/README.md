@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-This branch supports versions 1.15 and later. If your Kubernetes is version 1.14, you can use the [alpha version of this webhook](https://github.com/kubernetes-sigs/windows-gmsa/tree/alpha-1.14).
+This branch supports versions 1.23 and later. 
 
 ## How to deploy
 
