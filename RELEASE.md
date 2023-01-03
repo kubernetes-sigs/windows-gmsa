@@ -15,6 +15,7 @@ The Kubernetes Windows GMSA project is released on an as-needed basis. The proce
         ```
 
     1. Review / merge image promotion PR
+    1. Verify the image is available using `docker pull registry.k8s.io/gmsa-webhook/k8s-gmsa-webhook:$VERSION`.  The image is pushed to the release repository via the post submit which can take an hour or two to trigger. View results at https://testgrid.k8s.io/sig-k8s-infra-k8sio#post-k8sio-image-promo
 
 1. An OWNER creates a release with by
     1. Navigating to [releases](https://github.com/kubernetes-sigs/windows-gmsa/releases) and clicking on `Draft a new release`
@@ -32,6 +33,9 @@ The Kubernetes Windows GMSA project is released on an as-needed basis. The proce
         ```
 
     1. Clicking on `Publish Release`
+1. Update `image.tag` in `charts/gmsa/chart.yaml` to $VERSION and create new chart package:
+    1. Run `helm package charts/gmsa`. Make sure the resulting tgz file is in the `charts/repo` folder.
+    1. Run `helm repo index charts/repo/` to update the helm index
 1. The release issue is closed
 1. An announcement email is sent to `kubernetes-sig-windows@googlegroups.com` with the subject `[ANNOUNCE] Kubernetes SIG-Windows GMSA Webhook $VERSION is Released`
 1. An announcement is posted in `#SIG-windows` in the Kubernetes slack.
