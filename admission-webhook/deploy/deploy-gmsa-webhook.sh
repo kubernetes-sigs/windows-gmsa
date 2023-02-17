@@ -84,7 +84,7 @@ main() {
     local MANIFESTS_FILE=
     local NAME='gmsa-webhook'
     local NAMESPACE='gmsa-webhook'
-    local IMAGE_NAME='sigwindowstools/k8s-gmsa-webhook:latest'
+    local IMAGE_NAME='registry.k8s.io/gmsa-webhook/k8s-gmsa-webhook:latest'
     local CERTS_DIR='gmsa-webhook-certs'
     local DRY_RUN=false
     local OVERWRITE=false
