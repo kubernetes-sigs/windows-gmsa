@@ -36,6 +36,7 @@ The Kubernetes Windows GMSA project is released on an as-needed basis. The proce
 1. Update `image.tag` in `charts/gmsa/chart.yaml` to $VERSION and create new chart package:
     1. Run `helm package charts/gmsa`. Make sure the resulting tgz file is in the `charts/repo` folder.
     1. Run `helm repo index charts/repo/` to update the helm index
+1. Update the **IMAGE_NAME** variable in `admission_webhook/deploy/deploy-gmsa-webhook.sh` to use the latest released image.
 1. The release issue is closed
 1. An announcement email is sent to `kubernetes-sig-windows@googlegroups.com` with the subject `[ANNOUNCE] Kubernetes SIG-Windows GMSA Webhook $VERSION is Released`
 1. An announcement is posted in `#SIG-windows` in the Kubernetes slack.
