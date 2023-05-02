@@ -1,6 +1,6 @@
 module github.com/kubernetes-sigs/windows-gmsa/admission-webhook
 
-go 1.19
+go 1.20
 
 require (
 	github.com/mitchellh/go-homedir v1.1.0
