@@ -20,7 +20,7 @@ KIND = $(DEV_DIR)/kind-$(KIND_VERSION)
 KIND_URL = https://github.com/kubernetes-sigs/kind/releases/download/v$(KIND_VERSION)/kind-$(UNAME)-amd64
 
 KUBECTL = $(shell which kubectl 2> /dev/null)
-KUBECTL_URL = https://storage.googleapis.com/kubernetes-release/release/v$(KUBERNETES_VERSION)/bin/$(UNAME)/amd64/kubectl
+KUBECTL_URL = https://dl.k8s.io/release/v$(KUBERNETES_VERSION)/bin/$(UNAME)/amd64/kubectl
 
 ifeq ($(KUBECTL),)
 KUBECTL = $(DEV_DIR)/kubectl-$(KUBERNETES_VERSION)
