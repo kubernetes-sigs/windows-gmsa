@@ -59,4 +59,4 @@ clean: cluster_clean clean_integration_tests deps_clean
 
 .PHONY: release-staging 
 release-staging: ## Builds and push webhook image to k8s-staging bucket
-	REGISTRY=$(STAGING_REGISTRY) $(MAKE) image_build image_push
+	REGISTRY=$(STAGING_REGISTRY) $(MAKE) image_build_and_push
