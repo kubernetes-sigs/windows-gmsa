@@ -7,12 +7,15 @@ timeout: 1200s
 options:
   substitution_option: ALLOW_LOOSE
 steps:
-  - name: 'gcr.io/k8s-staging-test-infra/gcb-docker-gcloud:v20210917-12df099d55'
+  - name:  'gcr.io/k8s-staging-test-infra/gcb-docker-gcloud:v20230111-cd1b3caf9c'
     entrypoint: bash
     env:
     - DOCKER_CLI_EXPERIMENTAL=enabled
     - TAG=${_GIT_TAG}
     - PULL_BASE_REF=${_PULL_BASE_REF}
+      # default cloudbuild has HOME=/builder/home and docker buildx is in /root/.docker/cli-plugins/docker-buildx
+      # set the home to /root explicitly to if using docker buildx
+    - HOME=/root
     args:
     - -c
     - |
