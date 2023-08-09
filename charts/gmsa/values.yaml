@@ -26,7 +26,7 @@ image:
   imagePullPolicy: IfNotPresent
 
 # if true, will add os fields to pod specs for K8s versions where feature is in beta (v1.24+)
-setPodOs: ture
+setPodOs: true
 
 global:
   systemDefaultRegistry: ""
