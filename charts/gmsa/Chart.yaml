@@ -1,5 +1,5 @@
 apiVersion: v2
-appVersion: 0.6.1
+appVersion: 0.7.0
 description: Windows GMSA Configuration
 keywords:
 - Windows
@@ -10,4 +10,4 @@ name: gmsa
 sources:
 - https://github.com/kubernetes-sigs/windows-gmsa
 type: application
-version: 0.7.1
+version: 0.7.2
