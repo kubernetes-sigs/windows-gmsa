@@ -2,7 +2,7 @@
 
 The Kubernetes Windows GMSA project is released on an as-needed basis. The process is as follows:
 
-1. An issue is created proposing a new release with a changelog since the last release
+1. An issue is created proposing a new release with a changelog since the last release using the [Cut a release issue template](.github//ISSUE_TEMPLATE/new-release.md)
 1. All [OWNERS](OWNERS) must LGTM this release issue
 1. An OWNER runs `git tag -s $VERSION` from `master` branch and pushes the tag with `git push $VERSION`
 1. An OWNER promotes the `gcr.io/k8s-staging-gmsa-webhook/k8s-gmsa-webhook` image built the tagged commit.
