@@ -22,11 +22,11 @@ containerPort: "443"
 
 image:
   repository: registry.k8s.io/gmsa-webhook/k8s-gmsa-webhook
-  tag: v0.6.1
+  tag: v0.7.0
   imagePullPolicy: IfNotPresent
 
 # if true, will add os fields to pod specs for K8s versions where feature is in beta (v1.24+)
-setPodOs: ture
+setPodOs: true
 
 global:
   systemDefaultRegistry: ""
