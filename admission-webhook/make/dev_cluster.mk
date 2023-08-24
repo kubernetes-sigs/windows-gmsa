@@ -26,7 +26,7 @@ ifeq ($(KUBECTL),)
 KUBECTL = $(DEV_DIR)/kubectl-$(KUBERNETES_VERSION)
 endif
 
-KUBECONFIG?="~/.kube/kind-config-$(CLUSTER_NAME)"
+KUBECONFIG?="$(HOME)/.kube/kind-config-$(CLUSTER_NAME)"
 
 # starts a new kind cluster (see https://github.com/kubernetes-sigs/kind)
 .PHONY: cluster_start
