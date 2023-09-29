@@ -12,7 +12,7 @@ webhooks:
     clientConfig:
       service:
         name: {{ .Release.Name }}
-        namespace: {{.Release.Namespace}}
+        namespace: {{ .Release.Namespace }}
         path: "/validate"
       {{- if not (.Values.certificates.certManager.enabled) }}
       caBundle: {{ .Values.certificates.caBundle }}
@@ -34,4 +34,3 @@ webhooks:
         - key: windows.k8s.io/disabled
           operator: NotIn
           values: ["true"]
-

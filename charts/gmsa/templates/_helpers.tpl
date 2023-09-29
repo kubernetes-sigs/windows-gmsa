@@ -43,4 +43,3 @@ apiVersion: cert-manager.io/v1
 INSERT_CERTIFICATE_FROM_SECRET
 {{- end -}}
 {{- end }}
-

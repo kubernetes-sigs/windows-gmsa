@@ -5,7 +5,6 @@ metadata:
   name: {{ .Release.Name }}
   namespace: {{ .Release.Namespace }}
   labels:  {{ include "gmsa.chartref" . | nindent 4 }}
-
 spec:
 {{- if .Values.podDisruptionBudget.minAvailable }}
   minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}

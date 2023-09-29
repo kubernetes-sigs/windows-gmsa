@@ -7,9 +7,8 @@ metadata:
 subjects:
   - kind: ServiceAccount
     name: {{ .Release.Name }}
-    namespace: {{.Release.Namespace}}
+    namespace: {{ .Release.Namespace }}
 roleRef:
   kind: ClusterRole
   name: {{ .Release.Name }}
   apiGroup: rbac.authorization.k8s.io
-
