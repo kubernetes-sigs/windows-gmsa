@@ -4,6 +4,6 @@ This chart creates the GMSA CRD, Credential, and Admission Webhook. The official
 
 ## Prerequisites
 
-- Active Directory that support Group Managed Service Accounts
+- Active Directory that supports Group Managed Service Accounts
 - A Group Managed Service Account
 - Kubernetes v1.23+

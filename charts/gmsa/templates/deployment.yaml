@@ -1,8 +1,8 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ .Release.Name}}
-  namespace: {{.Release.Namespace}}
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
   labels: {{ include "gmsa.chartref" . | nindent 4 }}
 spec:
   replicas: {{ .Values.replicaCount }}
@@ -69,4 +69,3 @@ spec:
       os:
         name: linux
       {{- end -}}
-

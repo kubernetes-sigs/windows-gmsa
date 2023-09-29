@@ -34,4 +34,3 @@ webhooks:
         - key: windows.k8s.io/disabled
           operator: NotIn
           values: ["true"]
-
