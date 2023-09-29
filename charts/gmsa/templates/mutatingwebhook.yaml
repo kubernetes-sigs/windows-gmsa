@@ -15,7 +15,7 @@ webhooks:
         namespace: {{.Release.Namespace}}
         path: "/mutate"
       {{- if not (.Values.certificates.certManager.enabled) }}
-      caBundle: {{ .Values.certificates.caBundle }}
+      caBundle: {{ template "certificates.cabundle" . }}
       {{- end }}
     rules:
       - operations: ["CREATE"]
@@ -34,4 +34,3 @@ webhooks:
         - key: windows.k8s.io/disabled
           operator: NotIn
           values: ["true"]
-
