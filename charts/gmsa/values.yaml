@@ -10,6 +10,10 @@ certificates:
 
 credential:
   enabled: false
+  hostAccountConfig: {}
+    # pluginGUID: "" # CCG Plugin GUID
+    # portableCcgVersion: "1" # This needs to equal the current version of CCG which right now is '1'
+    # pluginInput: "" # Format of this field is dependent upon specific CCG Plugin
   domainJoinConfig:
     dnsName: "" # DNS Domain Name
     dnsTreeName: "" # DNS Domain Name Root
