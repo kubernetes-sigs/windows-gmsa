@@ -32,7 +32,7 @@ global:
   systemDefaultRegistry: ""
 
 affinity: {}
-nodeselector: {}
+nodeSelector: {}
 podDisruptionBudget:
   enabled: false
   # minAvailable: 1
