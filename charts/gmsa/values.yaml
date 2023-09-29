@@ -11,12 +11,12 @@ certificates:
 credential:
   enabled: false
   domainJoinConfig:
-    dnsName: ""  #DNS Domain Name
-    dnsTreeName: "" #DNS Domain Name Root
-    guid: ""  #GUID
-    machineAccountName: "" #Username of the GMSA account
-    netBiosName: ""  #NETBIOS Domain Name
-    sid: "" #SID of GMSA
+    dnsName: "" # DNS Domain Name
+    dnsTreeName: "" # DNS Domain Name Root
+    guid: "" # GUID of Domain
+    machineAccountName: "" # Username of the GMSA account
+    netBiosName: "" # NETBIOS Domain Name
+    sid: "" # SID of Domain
 
 containerPort: "443"
 
@@ -25,7 +25,7 @@ image:
   tag: v0.7.0
   imagePullPolicy: IfNotPresent
 
-# if true, will add os fields to pod specs for K8s versions where feature is in beta (v1.24+)
+# If true, will add os fields to pod specs for K8s versions where feature is in beta (v1.24+)
 setPodOs: true
 
 global:
