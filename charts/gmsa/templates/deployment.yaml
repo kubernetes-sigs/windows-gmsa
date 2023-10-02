@@ -53,9 +53,9 @@ spec:
               value: /tls/crt
             - name: HTTPS_PORT
               value: "{{ .Values.containerPort }}"
-      {{- if .Values.securityContext }}
-      securityContext: {{ toYaml .Values.securityContext | nindent 12 }}
-      {{- end }}
+          {{- if .Values.securityContext }}
+          securityContext: {{ toYaml .Values.securityContext | nindent 12 }}
+          {{- end }}
       volumes:
         - name: tls
           secret:
