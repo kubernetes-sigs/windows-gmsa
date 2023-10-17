@@ -42,6 +42,9 @@ The following table lists the configurable parameters of the latest GMSA chart a
 | `credential.domainJoinConfig.machineAccountName`      | username of the GMSA account                                      |                                                       |
 | `credential.domainJoinConfig.netBiosName`             | NETBIOS Domain Name                                               |                                                       |
 | `credential.domainJoinConfig.sid`                     | SID                                                               |                                                       |
+| `credential.hostAccountConfig.pluginGUID`             | GUID of CCG Plugin                                                |                                                       |
+| `credential.hostAccountConfigg.portableCcgVersion`    | Version of CCG Plugin                                             | `1`                                                   |
+| `credential.hostAccountConfig.pluginInput`            | Input to CCG Plugin                                               |                                                       |
 | `image.repository`                                    | image repository                                                  | `registry.k8s.io/gmsa-webhook/k8s-gmsa-webhook`       |
 | `image.tag`                                           | image tag                                                         | `v0.4.0`                                              |
 | `image.imagePullPolicy`                               | image pull policy                                                 | `IfNotPresent`                                        |
