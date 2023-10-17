@@ -26,7 +26,9 @@ apiVersion: cert-manager.io/v1
 {{- end }}
 
 {{- define "certificates.cabundle"}}
-{{- if gt (len (lookup "rbac.authorization.k8s.io/v1" "ClusterRole" "" "")) 0 -}}
+{{- if .Values.certificates.caBundle }}
+{{- .Values.certificates.caBundle }}
+{{- else if gt (len (lookup "rbac.authorization.k8s.io/v1" "ClusterRole" "" "")) 0 -}}
 {{- $secret := (lookup "v1" "Secret" .Release.Namespace .Values.certificates.secretName) -}}
 {{- if lt (len $secret) 1 -}}
 {{- required (printf "CA Bundle secret '%s' in namespace '%s' must exist" .Values.certificates.secretName .Release.Namespace) "" -}}
