@@ -60,6 +60,6 @@ The release process is documented [HERE](../../RELEASE.md)!
   - [ ] Set `Set as latest release`
   - [ ] Update the release
 
-- [ ] Send an announce email to `kuberntes-sig-windows@googlegroups.com` with the subject `[ANNOUNCE] Kubernetes SIG-Windows GMSA Webhook $VERSION is Released`
+- [ ] Send an announce email to `kubernetes-sig-windows@googlegroups.com` with the subject `[ANNOUNCE] Kubernetes SIG-Windows GMSA Webhook $VERSION is Released`
 
 - [ ] Post new release in slack
