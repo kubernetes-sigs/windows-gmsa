@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -21,7 +22,6 @@ import (
 
 type webhookOperation string
 
-//
 type gmsaResourceKind string
 
 const (
@@ -77,7 +77,19 @@ func (webhook *webhook) start(port int, tlsConfig *tlsConfig, listeningChan chan
 	if tlsConfig == nil {
 		err = webhook.server.Serve(keepAliveListener)
 	} else {
-		err = webhook.server.ServeTLS(keepAliveListener, tlsConfig.crtPath, tlsConfig.keyPath)
+		certReloader := NewCertReloader(tlsConfig.crtPath, tlsConfig.keyPath)
+		_, err = certReloader.LoadCertificate()
+		if err != nil {
+			return err
+		}
+
+		go watchCertFiles(certReloader)
+
+		webhook.server.TLSConfig = &tls.Config{
+			GetCertificate: certReloader.GetCertificateFunc(),
+		}
+
+		err = webhook.server.ServeTLS(keepAliveListener, "", "")
 	}
 
 	if err != nil {
