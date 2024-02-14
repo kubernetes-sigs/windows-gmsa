@@ -49,7 +49,6 @@ func watchCertFiles(certReloader *CertReloader) {
 	}
 	defer watcher.Close()
 
-	done := make(chan bool)
 	go func() {
 		for {
 			select {
@@ -77,12 +76,10 @@ func watchCertFiles(certReloader *CertReloader) {
 
 	err = watcher.Add(certReloader.certPath)
 	if err != nil {
-		logrus.Errorf("error watching certificate file: %v", err)
+		logrus.Fatalf("error watching certificate file: %v", err)
 	}
 	err = watcher.Add(certReloader.keyPath)
 	if err != nil {
-		logrus.Errorf("error watching key file: %v", err)
+		logrus.Fatalf("error watching key file: %v", err)
 	}
-
-	<-done
 }
