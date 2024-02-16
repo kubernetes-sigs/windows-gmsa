@@ -413,6 +413,18 @@ func TestValidateUpdateRequest(t *testing.T) {
 	})
 }
 
+func TestDefaultWebhookConfig(t *testing.T) {
+	expectedCertReload := false
+	webhook := newWebhookWithOptions(nil, WithCertReload(expectedCertReload))
+	assert.Equal(t, expectedCertReload, webhook.config.EnableCertReload)
+}
+
+func TestSetWebhookConfig(t *testing.T) {
+	expectedCertReload := true
+	webhook := newWebhookWithOptions(nil, WithCertReload(expectedCertReload))
+	assert.Equal(t, expectedCertReload, webhook.config.EnableCertReload)
+}
+
 func TestEqualStringPointers(t *testing.T) {
 	ptrToString := func(s *string) string {
 		if s == nil {

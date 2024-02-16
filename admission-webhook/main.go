@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"strconv"
@@ -13,12 +14,15 @@ import (
 func main() {
 	initLogrus()
 
+	enableCertReload := flag.Bool("cert-reload", false, "enable certificate reload")
+	flag.Parse()
+
 	kubeClient, err := createKubeClient()
 	if err != nil {
 		panic(err)
 	}
 
-	webhook := newWebhook(kubeClient)
+	webhook := newWebhookWithOptions(kubeClient, WithCertReload(*enableCertReload))
 
 	tlsConfig := &tlsConfig{
 		crtPath: env("TLS_CRT"),

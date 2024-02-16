@@ -38,6 +38,7 @@ const (
 type webhook struct {
 	server *http.Server
 	client kubeClientInterface
+	config *WebhookConfig
 }
 
 type podAdmissionError struct {
@@ -46,8 +47,33 @@ type podAdmissionError struct {
 	pod  *corev1.Pod
 }
 
+type WebhookConfig struct {
+	EnableCertReload bool
+}
+
+type WebhookOption func(*WebhookConfig)
+
+func WithCertReload(enabled bool) WebhookOption {
+	return func(cfg *WebhookConfig) {
+		cfg.EnableCertReload = enabled
+	}
+}
+
 func newWebhook(client kubeClientInterface) *webhook {
-	return &webhook{client: client}
+	return newWebhookWithOptions(client)
+}
+
+func newWebhookWithOptions(client kubeClientInterface, options ...WebhookOption) *webhook {
+	config := &WebhookConfig{EnableCertReload: false}
+
+	for _, option := range options {
+		option(config)
+	}
+
+	return &webhook{
+		client: client,
+		config: config,
+	}
 }
 
 // start is a blocking call.
@@ -77,19 +103,23 @@ func (webhook *webhook) start(port int, tlsConfig *tlsConfig, listeningChan chan
 	if tlsConfig == nil {
 		err = webhook.server.Serve(keepAliveListener)
 	} else {
-		certReloader := NewCertReloader(tlsConfig.crtPath, tlsConfig.keyPath)
-		_, err = certReloader.LoadCertificate()
-		if err != nil {
-			return err
+		if webhook.config.EnableCertReload {
+			certReloader := NewCertReloader(tlsConfig.crtPath, tlsConfig.keyPath)
+			_, err = certReloader.LoadCertificate()
+			if err != nil {
+				return err
+			}
+
+			go watchCertFiles(certReloader)
+
+			webhook.server.TLSConfig = &tls.Config{
+				GetCertificate: certReloader.GetCertificateFunc(),
+			}
+
+			err = webhook.server.ServeTLS(keepAliveListener, "", "")
+		} else {
+			err = webhook.server.ServeTLS(keepAliveListener, tlsConfig.crtPath, tlsConfig.keyPath)
 		}
-
-		go watchCertFiles(certReloader)
-
-		webhook.server.TLSConfig = &tls.Config{
-			GetCertificate: certReloader.GetCertificateFunc(),
-		}
-
-		err = webhook.server.ServeTLS(keepAliveListener, "", "")
 	}
 
 	if err != nil {
