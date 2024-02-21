@@ -2,6 +2,7 @@ package integrationtests
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -365,6 +366,30 @@ func TestDeployV1CredSpecGetAllVersions(t *testing.T) {
 	assert.Equal(t, v1alpha1CredSpec.Object["credSpec"], v1CredSpec.Object["credSpec"])
 }
 
+func TestPossibleToUpdatePodWithNewCert(t *testing.T) {
+	testName := "possible-to-update-pod-with-new-cert"
+	credSpecTemplates := []string{"credspec-0"}
+	newSecretTemplate := "new-secret"
+	templates := []string{"credspecs-users-rbac-role", "service-account", "sa-rbac-binding", "single-pod-with-container-level-gmsa"}
+
+	testConfig, tearDownFunc := integrationTestSetup(t, testName, credSpecTemplates, templates)
+	defer tearDownFunc()
+
+	pod := waitForPodToComeUp(t, testConfig.Namespace, "app="+testName)
+	assert.Equal(t, expectedCredSpec0, extractContainerCredSpecContents(t, pod, testName))
+
+	// read test cert & key
+	newCert, _ := os.ReadFile("../testdata/cert.pem")
+	newKey, _ := os.ReadFile("../testdata/key.pem")
+	testConfig.Cert = base64.StdEncoding.EncodeToString(newCert)
+	testConfig.Key = base64.StdEncoding.EncodeToString(newKey)
+
+	// apply the new cert & key pair
+	renderedTemplate := renderTemplate(t, testConfig, newSecretTemplate)
+	success, _, _ := applyManifest(t, renderedTemplate)
+	assert.True(t, success)
+}
+
 /* Helpers */
 
 type testConfig struct {
@@ -378,6 +403,8 @@ type testConfig struct {
 	RoleBindingName    string
 	Image              string
 	ExtraSpecLines     []string
+	Cert               string
+	Key                string
 }
 
 // integrationTestSetup creates a new namespace to play in, and returns a function to
