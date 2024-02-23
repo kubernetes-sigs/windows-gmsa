@@ -67,6 +67,7 @@ func watchCertFiles(certReloader *CertReloader) {
 				}
 			case err, ok := <-watcher.Errors:
 				if !ok {
+					logrus.Errorf("watcher error returned !ok: %v", err)
 					return
 				}
 				logrus.Errorf("watcher error: %v", err)
