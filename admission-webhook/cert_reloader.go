@@ -8,6 +8,12 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+type CertLoader interface {
+	CertPath() string
+	KeyPath() string
+	LoadCertificate() (*tls.Certificate, error)
+}
+
 type CertReloader struct {
 	sync.Mutex
 	certPath    string
@@ -20,6 +26,14 @@ func NewCertReloader(certPath, keyPath string) *CertReloader {
 		certPath: certPath,
 		keyPath:  keyPath,
 	}
+}
+
+func (cr *CertReloader) CertPath() string {
+	return cr.certPath
+}
+
+func (cr *CertReloader) KeyPath() string {
+	return cr.keyPath
 }
 
 // LoadCertificate loads or reloads the certificate from disk.
@@ -42,14 +56,15 @@ func (cr *CertReloader) GetCertificateFunc() func(*tls.ClientHelloInfo) (*tls.Ce
 	}
 }
 
-func watchCertFiles(certReloader *CertReloader) {
+func watchCertFiles(certLoader CertLoader) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		logrus.Errorf("error creating watcher: %v", err)
 	}
-	defer watcher.Close()
 
 	go func() {
+		defer watcher.Close()
+
 		for {
 			select {
 			case event, ok := <-watcher.Events:
@@ -58,7 +73,7 @@ func watchCertFiles(certReloader *CertReloader) {
 				}
 				if event.Op&fsnotify.Write == fsnotify.Write || event.Op&fsnotify.Rename == fsnotify.Rename {
 					logrus.Infof("detected change in certificate file: %v", event.Name)
-					_, err := certReloader.LoadCertificate()
+					_, err := certLoader.LoadCertificate()
 					if err != nil {
 						logrus.Errorf("error reloading certificate: %v", err)
 					} else {
@@ -75,11 +90,11 @@ func watchCertFiles(certReloader *CertReloader) {
 		}
 	}()
 
-	err = watcher.Add(certReloader.certPath)
+	err = watcher.Add(certLoader.CertPath())
 	if err != nil {
 		logrus.Fatalf("error watching certificate file: %v", err)
 	}
-	err = watcher.Add(certReloader.keyPath)
+	err = watcher.Add(certLoader.KeyPath())
 	if err != nil {
 		logrus.Fatalf("error watching key file: %v", err)
 	}

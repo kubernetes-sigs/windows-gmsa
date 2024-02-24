@@ -1,8 +1,11 @@
 package main
 
 import (
+	"crypto/tls"
 	"os"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 // TestCertReloader tests the reloading functionality of the certificate.
@@ -49,4 +52,63 @@ func TestCertReloader(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to reload certificate: %v", err)
 	}
+}
+
+type mockCertLoader struct {
+	certPath     string
+	keyPath      string
+	loadCertFunc func() (*tls.Certificate, error)
+}
+
+func (m *mockCertLoader) CertPath() string {
+	return m.certPath
+}
+
+func (m *mockCertLoader) KeyPath() string {
+	return m.keyPath
+}
+
+func (m *mockCertLoader) LoadCertificate() (*tls.Certificate, error) {
+	return m.loadCertFunc()
+}
+
+func TestWatchingCertFiles(t *testing.T) {
+	tmpCertFile, err := os.CreateTemp("", "cert*.pem")
+	if err != nil {
+		t.Fatalf("Failed to create temp cert file: %v", err)
+	}
+	defer os.Remove(tmpCertFile.Name())
+
+	tmpKeyFile, err := os.CreateTemp("", "key*.pem")
+	if err != nil {
+		t.Fatalf("Failed to create temp key file: %v", err)
+	}
+	defer os.Remove(tmpKeyFile.Name())
+
+	loadCertFuncChan := make(chan bool)
+
+	cl := &mockCertLoader{
+		certPath: tmpCertFile.Name(),
+		keyPath:  tmpKeyFile.Name(),
+		loadCertFunc: func() (*tls.Certificate, error) {
+			loadCertFuncChan <- true
+			return &tls.Certificate{}, nil
+		},
+	}
+
+	go func() {
+		defer close(loadCertFuncChan)
+
+		called := <-loadCertFuncChan
+		assert.True(t, called)
+	}()
+
+	watchCertFiles(cl)
+
+	newCertData, _ := os.ReadFile("testdata/cert.pem")
+	if err := os.WriteFile(tmpCertFile.Name(), newCertData, 0644); err != nil {
+		t.Fatalf("Failed to write new data to cert file: %v", err)
+	}
+
+	<-loadCertFuncChan
 }
