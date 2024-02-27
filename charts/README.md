@@ -35,6 +35,7 @@ The following table lists the configurable parameters of the latest GMSA chart a
 | `certificates.certManager.version`                    | version of cert manager                                           |                                                       |
 | `certificates.caBundle`                               | cert-manager disabled, add self-signed ca.crt in base64 format    |                                                       |
 | `certificates.secretName`                             | cert-manager disabled, upload certs data as k8s secretName        | `gmsa-server-cert`                                    |
+| `certificates.certReload.enabled`                     | enable cert reload on changes                                     | `false`                                    |
 | `credential.enabled`                                  | enable creation of GMSA Credential                                | `true`                                                |
 | `credential.domainJoinConfig.dnsName`                 | DNS Domain Name                                                   |                                                       |
 | `credential.domainJoinConfig.dnsTreeName`             | DNS Domain Name Root                                              |                                                       |

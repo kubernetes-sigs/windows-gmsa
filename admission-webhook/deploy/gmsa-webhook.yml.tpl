@@ -102,6 +102,8 @@ spec:
             value: /tls/key
           - name: TLS_CRT
             value: /tls/crt
+        args:
+          - --cert-reload=true
       volumes:
       - name: tls
         secret:
