@@ -56,6 +56,8 @@ spec:
           {{- if .Values.securityContext }}
           securityContext: {{ toYaml .Values.securityContext | nindent 12 }}
           {{- end }}
+          args:
+            - --cert-reload={{ .Values.certificates.certReload.enabled }}
       volumes:
         - name: tls
           secret:

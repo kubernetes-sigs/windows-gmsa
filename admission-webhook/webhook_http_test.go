@@ -170,6 +170,52 @@ func TestHTTPWebhook(t *testing.T) {
 	})
 }
 
+func TestStartHTTPWebhookWithCertReload(t *testing.T) {
+	authorizedToUseCredSpec := true
+
+	kubeClient := &dummyKubeClient{
+		isAuthorizedToUseCredSpecFunc: func(ctx context.Context, serviceAccountName, namespace, credSpecName string) (authorized bool, reason string) {
+			assert.Equal(t, dummyServiceAccoutName, serviceAccountName)
+			assert.Equal(t, dummyNamespace, namespace)
+			assert.Equal(t, dummyCredSpecName, credSpecName)
+
+			return authorizedToUseCredSpec, "bogus reason"
+		},
+		retrieveCredSpecContentsFunc: func(ctx context.Context, credSpecName string) (contents string, httpCode int, err error) {
+			assert.Equal(t, dummyCredSpecName, credSpecName)
+
+			contents = dummyCredSpecContents
+			return
+		},
+	}
+
+	webhook := newWebhookWithOptions(kubeClient, WithCertReload(true))
+	port := getAvailablePort(t)
+	tlsConfig := &tlsConfig{
+		crtPath: "testdata/cert.pem",
+		keyPath: "testdata/key.pem",
+	}
+
+	listeningChan := make(chan interface{})
+	go func() {
+		assert.Nil(t, webhook.start(port, tlsConfig, listeningChan))
+	}()
+	defer webhook.stop()
+
+	select {
+	case <-listeningChan:
+		for {
+			if webhook.server.TLSConfig != nil {
+				break
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+		assert.NotNil(t, webhook.server.TLSConfig.GetCertificate)
+	case <-time.After(5 * time.Second):
+		t.Fatalf("Timed out waiting for HTTP server to start listening on %d", port)
+	}
+}
+
 func startHTTPServer(t *testing.T, kubeClient *dummyKubeClient) (int, func()) {
 	webhook := newWebhook(kubeClient)
 	port := getAvailablePort(t)

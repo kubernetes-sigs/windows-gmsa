@@ -3,6 +3,7 @@ module github.com/kubernetes-sigs/windows-gmsa/admission-webhook
 go 1.21
 
 require (
+	github.com/fsnotify/fsnotify v1.7.0
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.8.4

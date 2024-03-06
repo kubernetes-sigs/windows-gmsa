@@ -2,6 +2,7 @@ package integrationtests
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -365,6 +366,42 @@ func TestDeployV1CredSpecGetAllVersions(t *testing.T) {
 	assert.Equal(t, v1alpha1CredSpec.Object["credSpec"], v1CredSpec.Object["credSpec"])
 }
 
+func TestPossibleToUpdatePodWithNewCert(t *testing.T) {
+	/** TODO:
+		 * - update the webhook pod to use the new flag
+	     * - make a request to create a pod to make sure it works (already done)
+	     * - get a blessed certificate from the API server
+		 *   (https://github.com/kubernetes-sigs/windows-gmsa/blob/141/admission-webhook/deploy/create-signed-cert.sh)
+	     * - update existing secret in place and wait for the pod to get new secrets which can take time
+		 *   (https://kubernetes.io/docs/concepts/configuration/secret/#using-secrets-as-files-from-a-pod) - similar to what you are doing here
+	     * - kubectl exec into the running pod to see that the secret changed
+		 *   (using utils like https://github.com/ycheng-kareo/windows-gmsa/blob/watch-reload-cert/admission-webhook/integration_tests/kube.go#L199)
+	     * - make a request to create a pod to verify that it still works (pod := waitForPodToComeUp(t, testConfig.Namespace, "app="+testName))
+		 * - add a separate test to verify that requests to the webhook always return during this process
+	*/
+	testName := "possible-to-update-pod-with-new-cert"
+	credSpecTemplates := []string{"credspec-0"}
+	newSecretTemplate := "new-secret"
+	templates := []string{"credspecs-users-rbac-role", "service-account", "sa-rbac-binding", "single-pod-with-container-level-gmsa"}
+
+	testConfig, tearDownFunc := integrationTestSetup(t, testName, credSpecTemplates, templates)
+	defer tearDownFunc()
+
+	pod := waitForPodToComeUp(t, testConfig.Namespace, "app="+testName)
+	assert.Equal(t, expectedCredSpec0, extractContainerCredSpecContents(t, pod, testName))
+
+	// read test cert & key
+	newCert, _ := os.ReadFile("../testdata/cert.pem")
+	newKey, _ := os.ReadFile("../testdata/key.pem")
+	testConfig.Cert = base64.StdEncoding.EncodeToString(newCert)
+	testConfig.Key = base64.StdEncoding.EncodeToString(newKey)
+
+	// apply the new cert & key pair
+	renderedTemplate := renderTemplate(t, testConfig, newSecretTemplate)
+	success, _, _ := applyManifest(t, renderedTemplate)
+	assert.True(t, success)
+}
+
 /* Helpers */
 
 type testConfig struct {
@@ -378,6 +415,8 @@ type testConfig struct {
 	RoleBindingName    string
 	Image              string
 	ExtraSpecLines     []string
+	Cert               string
+	Key                string
 }
 
 // integrationTestSetup creates a new namespace to play in, and returns a function to

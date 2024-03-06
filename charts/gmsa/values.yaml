@@ -7,6 +7,9 @@ certificates:
   caBundle: ""
   # If cert-manager integration is disabled, upload certs data (ca.crt, tls.crt and tls.key) as k8s secretName in the namespace
   secretName: gmsa-server-cert
+  certReload:
+    # Enable cert reload when the certs change
+    enabled: false
 
 credential:
   enabled: false
