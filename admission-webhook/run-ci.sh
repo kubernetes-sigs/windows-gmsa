@@ -91,11 +91,10 @@ run_integration_tests() {
             exit 1
         fi
     else
-        if [[ "$DEPLOY_METHOD" == 'download' ]]; then
-            make integration_tests
-        fi
         if [[ "$DEPLOY_METHOD" == 'chart' ]]; then
             make integration_tests_chart
+        else 
+            make integration_tests
         fi
     fi
 }
