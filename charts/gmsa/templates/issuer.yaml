@@ -13,6 +13,10 @@ spec:
     kind: Issuer
     name: {{ .Release.Name }}
   secretName: {{ .Values.certificates.secretName }}
+  {{- if .Values.certificates.certReload.enabled }}
+  privateKey:
+    rotationPolicy: Always
+  {{- end }}
 ---
 {{ template "cert-manager.apiversion" . }}
 kind: Issuer

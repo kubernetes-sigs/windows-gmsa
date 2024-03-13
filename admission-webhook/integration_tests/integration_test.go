@@ -2,7 +2,6 @@ package integrationtests
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -11,7 +10,9 @@ import (
 	"path"
 	"reflect"
 	"strconv"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
@@ -368,20 +369,30 @@ func TestDeployV1CredSpecGetAllVersions(t *testing.T) {
 
 func TestPossibleToUpdatePodWithNewCert(t *testing.T) {
 	/** TODO:
-		 * - update the webhook pod to use the new flag
-	     * - make a request to create a pod to make sure it works (already done)
-	     * - get a blessed certificate from the API server
-		 *   (https://github.com/kubernetes-sigs/windows-gmsa/blob/141/admission-webhook/deploy/create-signed-cert.sh)
-	     * - update existing secret in place and wait for the pod to get new secrets which can take time
-		 *   (https://kubernetes.io/docs/concepts/configuration/secret/#using-secrets-as-files-from-a-pod) - similar to what you are doing here
-	     * - kubectl exec into the running pod to see that the secret changed
-		 *   (using utils like https://github.com/ycheng-kareo/windows-gmsa/blob/watch-reload-cert/admission-webhook/integration_tests/kube.go#L199)
-	     * - make a request to create a pod to verify that it still works (pod := waitForPodToComeUp(t, testConfig.Namespace, "app="+testName))
-		 * - add a separate test to verify that requests to the webhook always return during this process
-	*/
+	 * - add a separate test to verify that requests to the webhook always return during this process
+	 */
+
+	webHookNs := os.Getenv("NAMESPACE")
+	webHookDeploymentName := os.Getenv("DEPLOYMENT_NAME")
+	webhook, err := kubeClient(t).AppsV1().Deployments(webHookNs).Get(context.Background(), webHookDeploymentName, metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rotationEnabled := false
+	for arg := range webhook.Spec.Template.Spec.Containers[0].Args {
+		if strings.Contains(webhook.Spec.Template.Spec.Containers[0].Args[arg], "--cert-reload=true") {
+			rotationEnabled = true
+		}
+	}
+
+	if !rotationEnabled {
+		t.Skip("Skipping test as rotation is not enabled")
+	}
+
 	testName := "possible-to-update-pod-with-new-cert"
 	credSpecTemplates := []string{"credspec-0"}
-	newSecretTemplate := "new-secret"
+
 	templates := []string{"credspecs-users-rbac-role", "service-account", "sa-rbac-binding", "single-pod-with-container-level-gmsa"}
 
 	testConfig, tearDownFunc := integrationTestSetup(t, testName, credSpecTemplates, templates)
@@ -390,16 +401,54 @@ func TestPossibleToUpdatePodWithNewCert(t *testing.T) {
 	pod := waitForPodToComeUp(t, testConfig.Namespace, "app="+testName)
 	assert.Equal(t, expectedCredSpec0, extractContainerCredSpecContents(t, pod, testName))
 
-	// read test cert & key
-	newCert, _ := os.ReadFile("../testdata/cert.pem")
-	newKey, _ := os.ReadFile("../testdata/key.pem")
-	testConfig.Cert = base64.StdEncoding.EncodeToString(newCert)
-	testConfig.Key = base64.StdEncoding.EncodeToString(newKey)
+	deployMethod := os.Getenv("DEPLOY_METHOD")
+	if deployMethod == "chart" {
+		runCommandOrFail(t, "cmctl", "renew", webHookDeploymentName, "-n", webHookNs)
 
-	// apply the new cert & key pair
-	renderedTemplate := renderTemplate(t, testConfig, newSecretTemplate)
-	success, _, _ := applyManifest(t, renderedTemplate)
-	assert.True(t, success)
+		var (
+			timeout = 30 * time.Second
+			start   = time.Now()
+		)
+
+		for {
+			success, stdout, stderr := runKubectlCommand(t, "get", "certificaterequest", webHookNs+"-2", "--namespace", webHookNs, "-o", "jsonpath='{.status.conditions[?(@.type==\"Ready\")].status}'")
+			if !success {
+				fmt.Printf("Warning: command failed with %s, %s\n", stdout, stderr)
+				continue
+			}
+
+			if stdout == "'True'" {
+				break
+			} else {
+				fmt.Printf("Warning: status was %s", stdout)
+			}
+
+			if time.Since(start) >= timeout {
+				t.Fatal("Timeout: Unable to get the certificate request status")
+			}
+
+			time.Sleep(1 * time.Second)
+		}
+	} else {
+		/** TODO:
+		     * - get a blessed certificate from the API server
+			 *   (https://github.com/kubernetes-sigs/windows-gmsa/blob/141/admission-webhook/deploy/create-signed-cert.sh)
+			 *   runCommandOrFail(t, fmt."create-signed-cert.sh --service $NAME --namespace $NAMESPACE --certs-dir $CERTS_DIR", testConfig.Namespace)
+		     * - update existing secret in place and wait for the pod to get new secrets which can take time
+			 *   (https://kubernetes.io/docs/concepts/configuration/secret/#using-secrets-as-files-from-a-pod) - similar to what you are doing here
+		     * - kubectl exec into the running pod to see that the secret changed
+			 *   (using utils like https://github.com/ycheng-kareo/windows-gmsa/blob/watch-reload-cert/admission-webhook/integration_tests/kube.go#L199)
+		**/
+
+		t.Skip("Non chart deployment method not supported")
+	}
+
+	testName2 := testName + "after-rotation"
+	testConfig2, tearDownFunc2 := integrationTestSetup(t, testName2, credSpecTemplates, templates)
+	defer tearDownFunc2()
+
+	pod2 := waitForPodToComeUp(t, testConfig2.Namespace, "app="+testName2)
+	assert.Equal(t, expectedCredSpec0, extractContainerCredSpecContents(t, pod2, testName2))
 }
 
 /* Helpers */
