@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"os"
 	"testing"
@@ -86,6 +87,7 @@ func TestWatchingCertFiles(t *testing.T) {
 	defer os.Remove(tmpKeyFile.Name())
 
 	loadCertFuncChan := make(chan bool)
+	done := make(chan bool)
 
 	cl := &mockCertLoader{
 		certPath: tmpCertFile.Name(),
@@ -97,18 +99,19 @@ func TestWatchingCertFiles(t *testing.T) {
 	}
 
 	go func() {
-		defer close(loadCertFuncChan)
-
 		called := <-loadCertFuncChan
 		assert.True(t, called)
+		done <- true
 	}()
 
-	watchCertFiles(cl)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	watchCertFiles(ctx, cl)
 
 	newCertData, _ := os.ReadFile("testdata/cert.pem")
 	if err := os.WriteFile(tmpCertFile.Name(), newCertData, 0644); err != nil {
 		t.Fatalf("Failed to write new data to cert file: %v", err)
 	}
 
-	<-loadCertFuncChan
+	<-done
 }

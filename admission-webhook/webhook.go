@@ -111,7 +111,7 @@ func (webhook *webhook) start(port int, tlsConfig *tlsConfig, listeningChan chan
 				return err
 			}
 
-			go watchCertFiles(certReloader)
+			go watchCertFiles(context.Background(), certReloader)
 
 			webhook.server.TLSConfig = &tls.Config{
 				GetCertificate: certReloader.GetCertificateFunc(),

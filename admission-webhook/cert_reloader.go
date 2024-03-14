@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"sync"
 
@@ -56,7 +57,7 @@ func (cr *CertReloader) GetCertificateFunc() func(*tls.ClientHelloInfo) (*tls.Ce
 	}
 }
 
-func watchCertFiles(certLoader CertLoader) {
+func watchCertFiles(ctx context.Context, certLoader CertLoader) {
 	logrus.Infof("Starting certificate watcher on path %v and %v", certLoader.CertPath(), certLoader.KeyPath())
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
@@ -86,6 +87,9 @@ func watchCertFiles(certLoader CertLoader) {
 					return
 				}
 				logrus.Errorf("watcher error: %v", err)
+			case <-ctx.Done():
+				logrus.Info("stopping certificate watcher")
+				return
 			}
 		}
 	}()
