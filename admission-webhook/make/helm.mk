@@ -24,7 +24,7 @@ helm-lint:
 # deploys the chart to the kind cluster with the release image
 .PHONY: deploy_chart
 deploy_chart: install-helm
-	K8S_GMSA_IMAGE=$(IMAGE_NAME) $(MAKE) _deploy_chart
+	K8S_GMSA_IMAGE=$(WEBHOOK_IMG) $(MAKE) _deploy_chart
 
 # removes the chart from the kind cluster
 .PHONY: remove_chart
@@ -37,15 +37,15 @@ remove_chart:
 # $K8S_GMSA_DEPLOY_CHART_VERSION env variables to build the download URL. If VERSION is
 # not set then latest is used.
 .PHONY: _deploy_chart
-_deploy_chart:  _start_cluster_if_not_running _deploy_certmanager
+_deploy_chart:  _copy_image _deploy_certmanager
 ifeq ($(K8S_GMSA_CHART),)
 	@ echo "Cannot call target $@ without setting K8S_GMSA_CHART"
 	exit 1
 endif
-	@ echo "installing helm deployment $(DEPLOYMENT_NAME) with chart $(K8S_GMSA_CHART) and image $(IMAGE_REPO):$(VERSION)"
+	@ echo "installing helm deployment $(DEPLOYMENT_NAME) with chart $(K8S_GMSA_CHART) and image $(K8S_GMSA_IMAGE):$(TAG)"
 	KUBECONFIG=$(KUBECONFIG) $(KUBECTL) create namespace $(NAMESPACE)
 	KUBECONFIG=$(KUBECONFIG) $(HELM) version
-	KUBECONFIG=$(KUBECONFIG) $(HELM) install $(DEPLOYMENT_NAME) $(K8S_GMSA_CHART) --namespace $(NAMESPACE)
+	KUBECONFIG=$(KUBECONFIG) $(HELM) install $(DEPLOYMENT_NAME) $(K8S_GMSA_CHART) --set image.repository=$(K8S_GMSA_IMAGE) --set image.tag=$(TAG) --namespace $(NAMESPACE) $(HELM_INSTALL_FLAGS_FLAGS)
 	KUBECONFIG=$(KUBECONFIG) $(KUBECTL) wait -n $(NAMESPACE) pod -l app=$(DEPLOYMENT_NAME) --for=condition=Ready
 
 .PHONY: _deploy_certmanager
