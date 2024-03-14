@@ -104,6 +104,7 @@ func (webhook *webhook) start(port int, tlsConfig *tlsConfig, listeningChan chan
 		err = webhook.server.Serve(keepAliveListener)
 	} else {
 		if webhook.config.EnableCertReload {
+			logrus.Infof("Webhook certificate reload enabled")
 			certReloader := NewCertReloader(tlsConfig.crtPath, tlsConfig.keyPath)
 			_, err = certReloader.LoadCertificate()
 			if err != nil {

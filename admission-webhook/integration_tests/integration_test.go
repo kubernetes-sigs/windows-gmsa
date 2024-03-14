@@ -443,6 +443,10 @@ func TestPossibleToUpdatePodWithNewCert(t *testing.T) {
 		t.Skip("Non chart deployment method not supported")
 	}
 
+	//give a few mins to settle rotation
+	// TODO why is this needed?!
+	time.Sleep(120 * time.Second)
+
 	testName2 := testName + "after-rotation"
 	testConfig2, tearDownFunc2 := integrationTestSetup(t, testName2, credSpecTemplates, templates)
 	defer tearDownFunc2()

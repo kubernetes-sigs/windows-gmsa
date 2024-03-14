@@ -16,6 +16,7 @@ spec:
   {{- if .Values.certificates.certReload.enabled }}
   privateKey:
     rotationPolicy: Always
+  isCA: true
   {{- end }}
 ---
 {{ template "cert-manager.apiversion" . }}

@@ -57,6 +57,7 @@ func (cr *CertReloader) GetCertificateFunc() func(*tls.ClientHelloInfo) (*tls.Ce
 }
 
 func watchCertFiles(certLoader CertLoader) {
+	logrus.Infof("Starting certificate watcher on path %v and %v", certLoader.CertPath(), certLoader.KeyPath())
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		logrus.Errorf("error creating watcher: %v", err)
@@ -69,16 +70,15 @@ func watchCertFiles(certLoader CertLoader) {
 			select {
 			case event, ok := <-watcher.Events:
 				if !ok {
+					logrus.Errorf("watcher events returned !ok: %v", err)
 					return
 				}
-				if event.Op&fsnotify.Write == fsnotify.Write || event.Op&fsnotify.Rename == fsnotify.Rename {
-					logrus.Infof("detected change in certificate file: %v", event.Name)
-					_, err := certLoader.LoadCertificate()
-					if err != nil {
-						logrus.Errorf("error reloading certificate: %v", err)
-					} else {
-						logrus.Infof("successfully reloaded certificate")
-					}
+				logrus.Infof("detected change in certificate file: %v", event.Name)
+				_, err := certLoader.LoadCertificate()
+				if err != nil {
+					logrus.Errorf("error reloading certificate: %v", err)
+				} else {
+					logrus.Infof("successfully reloaded certificate")
 				}
 			case err, ok := <-watcher.Errors:
 				if !ok {
