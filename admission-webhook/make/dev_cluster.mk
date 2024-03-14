@@ -4,7 +4,7 @@ KUBERNETES_VERSION ?= 1.29.0
 # see https://github.com/kubernetes-sigs/kind/releases
 KIND_VERSION = 0.22.0
 # https://github.com/helm/helm/releases
-HELM_VERSION ?= 3.10.3
+HELM_VERSION ?= 3.14.3
 # https://github.com/cert-manager/cert-manager/releases
 CERT_MANAGER_VERSION ?= v1.14.4
 
