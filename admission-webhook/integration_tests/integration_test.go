@@ -440,15 +440,27 @@ func TestPossibleToUpdatePodWithNewCert(t *testing.T) {
 			 *   (using utils like https://github.com/ycheng-kareo/windows-gmsa/blob/watch-reload-cert/admission-webhook/integration_tests/kube.go#L199)
 		**/
 
-		t.Skip("Non chart deployment method not supported")
+		t.Skip("Non chart deployment method not supported for this test")
 	}
 
+	// it takes ~60 seconds for the webhook to pick up the new certificate
+	// so this first run makes sure the old cert still works
 	testName2 := testName + "after-rotation"
 	testConfig2, tearDownFunc2 := integrationTestSetup(t, testName2, credSpecTemplates, templates)
 	defer tearDownFunc2()
 
 	pod2 := waitForPodToComeUp(t, testConfig2.Namespace, "app="+testName2)
 	assert.Equal(t, expectedCredSpec0, extractContainerCredSpecContents(t, pod2, testName2))
+
+	// sleep a bit to ensure the the secret has been propagated to the pod
+	time.Sleep(90 * time.Second)
+
+	testName3 := testName + "after-rotation-propagated"
+	testConfig3, tearDownFunc3 := integrationTestSetup(t, testName3, credSpecTemplates, templates)
+	defer tearDownFunc3()
+
+	pod3 := waitForPodToComeUp(t, testConfig3.Namespace, "app="+testName3)
+	assert.Equal(t, expectedCredSpec0, extractContainerCredSpecContents(t, pod3, testName3))
 }
 
 /* Helpers */
