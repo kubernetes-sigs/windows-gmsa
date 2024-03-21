@@ -9,6 +9,10 @@ endif
 install-helm:
 	curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
 
+.PHONY: install-cmctl
+install-cmctl:
+	go install github.com/cert-manager/cmctl/v2@latest
+
 .PHONY: helm-chart
 helm-chart:
 	$(HELM) package ../charts/gmsa -d ../charts/repo/
@@ -36,8 +40,10 @@ remove_chart:
 # the deploy script as documented in the README, using $K8S_GMSA_DEPLOY_CHART_REPO and
 # $K8S_GMSA_DEPLOY_CHART_VERSION env variables to build the download URL. If VERSION is
 # not set then latest is used.
+# the HELM_INSTALL_FLAGS_FLAGS env var can be set to eg run only specific tests, e.g.:
+# HELM_INSTALL_FLAGS_FLAGS='--set certificates.certReload.enabled=true' make deploy_chart
 .PHONY: _deploy_chart
-_deploy_chart:  _copy_image _deploy_certmanager
+_deploy_chart:  _copy_image _deploy_certmanager install-cmctl
 ifeq ($(K8S_GMSA_CHART),)
 	@ echo "Cannot call target $@ without setting K8S_GMSA_CHART"
 	exit 1

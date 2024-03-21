@@ -113,3 +113,18 @@ jobs:
       env:
         T: integration
         DEPLOY_METHOD: chart
+  integration-rotation-enabled:
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: '1.21'
+    - id: test-runner
+      uses: ./.github/actions/tests
+      env:
+        T: integration
+        DEPLOY_METHOD: chart
+        HELM_INSTALL_FLAGS_FLAGS: --set certificates.certReload.enabled=true
+

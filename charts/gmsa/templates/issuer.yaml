@@ -13,6 +13,10 @@ spec:
     kind: Issuer
     name: {{ .Release.Name }}
   secretName: {{ .Values.certificates.secretName }}
+  {{- if .Values.certificates.certReload.enabled }}
+  privateKey:
+    rotationPolicy: Always
+  {{- end }}
 ---
 {{ template "cert-manager.apiversion" . }}
 kind: Issuer
@@ -21,5 +25,28 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels: {{ include "gmsa.chartref" . | nindent 4 }}
 spec:
+  ca:
+    secretName: {{ .Release.Name }}-root-ca
+---
+{{ template "cert-manager.apiversion" . }}
+kind: ClusterIssuer
+metadata:
+  name: {{ .Release.Name }}-ca
+spec:
   selfSigned: {}
+---
+{{ template "cert-manager.apiversion" . }}
+kind: Certificate
+metadata:
+  name: {{ .Release.Name }}-ca
+  namespace: {{ .Release.Namespace }}
+spec:
+  isCA: true
+  commonName: {{ .Release.Name }}-ca
+  secretName: {{ .Release.Name }}-root-ca
+  issuerRef:
+    name: {{ .Release.Name }}-ca
+    kind: ClusterIssuer
+    group: cert-manager.io
+---
 {{- end -}}
