@@ -1,5 +1,5 @@
 # must stay consistent with the go version defined in .travis.yml
-GO_VERSION = 1.21
+GO_VERSION = 1.22
 BUILD_ARGS = --build-arg GO_VERSION=$(GO_VERSION) --build-arg VERSION=$(TAG) 
 DOCKER_BUILD = docker build . $(BUILD_ARGS)
 
