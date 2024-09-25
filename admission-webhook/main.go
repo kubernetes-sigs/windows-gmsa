@@ -29,10 +29,7 @@ func main() {
 		keyPath: env("TLS_KEY"),
 	}
 
-	port, err := port("HTTPS_PORT")
-	if err != nil {
-		panic(err)
-	}
+	port := env_int("HTTPS_PORT", 443)
 
 	if err = webhook.start(port, tlsConfig, nil); err != nil {
 		panic(err)
@@ -83,7 +80,33 @@ func createKubeClient() (*kubeClient, error) {
 		return nil, err
 	}
 
+	config.QPS = env_float("QPS", rest.DefaultQPS)
+	config.Burst = env_int("BURST", rest.DefaultBurst)
+	logrus.Infof("QPS: %f, Burst: %d", config.QPS, config.Burst)
+
 	return newKubeClient(config)
+}
+
+func env_float(key string, defaultFloat float32) float32 {
+	if v, found := os.LookupEnv(key); found {
+		if i, err := strconv.ParseFloat(v, 32); err != nil {
+			return float32(i)
+		}
+		logrus.Warningf("unable to parse environment variable %s; using default value %f", key, defaultFloat)
+	}
+
+	return defaultFloat
+}
+
+func env_int(key string, defaultInt int) int {
+	if v, found := os.LookupEnv(key); found {
+		if i, err := strconv.Atoi(v); err != nil {
+			return i
+		}
+		logrus.Warningf("unable to parse environment variable %s; using default value %d", key, defaultInt)
+	}
+
+	return defaultInt
 }
 
 func env(key string) string {
@@ -91,11 +114,4 @@ func env(key string) string {
 		return value
 	}
 	panic(fmt.Errorf("%s env var not found", key))
-}
-
-func port(key string) (int, error) {
-	if port, found := os.LookupEnv(key); found {
-		return strconv.Atoi(port)
-	}
-	return 443, nil
 }
