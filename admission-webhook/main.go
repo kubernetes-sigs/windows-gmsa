@@ -89,10 +89,10 @@ func createKubeClient() (*kubeClient, error) {
 
 func env_float(key string, defaultFloat float32) float32 {
 	if v, found := os.LookupEnv(key); found {
-		if i, err := strconv.ParseFloat(v, 32); err != nil {
+		if i, err := strconv.ParseFloat(v, 32); err == nil {
 			return float32(i)
 		}
-		logrus.Warningf("unable to parse environment variable %s; using default value %f", key, defaultFloat)
+		logrus.Warningf("unable to parse environment variable %s with value %s; using default value %f", key, v, defaultFloat)
 	}
 
 	return defaultFloat
@@ -100,10 +100,10 @@ func env_float(key string, defaultFloat float32) float32 {
 
 func env_int(key string, defaultInt int) int {
 	if v, found := os.LookupEnv(key); found {
-		if i, err := strconv.Atoi(v); err != nil {
+		if i, err := strconv.Atoi(v); err == nil {
 			return i
 		}
-		logrus.Warningf("unable to parse environment variable %s; using default value %d", key, defaultInt)
+		logrus.Warningf("unable to parse environment variable %s with value %s; using default value %d", key, v, defaultInt)
 	}
 
 	return defaultInt

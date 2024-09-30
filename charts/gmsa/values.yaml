@@ -49,5 +49,5 @@ podSecurityContext: {}
 replicaCount: 2
 securityContext: {}
 tolerations: []
-qps: 30
+qps: 30.0
 burst: 50
