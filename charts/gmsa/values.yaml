@@ -2,7 +2,7 @@ certificates:
   certManager:
     # Enable cert manager integration. Cert manager should be already installed at the k8s cluster
     enabled: true
-    version: "v1.10.1"
+    version: "v1.15.3"
   # If cert-manager integration is disabled, add self-signed ca.crt in base64 format
   caBundle: ""
   # If cert-manager integration is disabled, upload certs data (ca.crt, tls.crt and tls.key) as k8s secretName in the namespace
@@ -29,7 +29,7 @@ containerPort: "443"
 
 image:
   repository: registry.k8s.io/gmsa-webhook/k8s-gmsa-webhook
-  tag: v0.8.0
+  tag: v0.9.0
   imagePullPolicy: IfNotPresent
 
 # If true, will add os fields to pod specs for K8s versions where feature is in beta (v1.24+)
