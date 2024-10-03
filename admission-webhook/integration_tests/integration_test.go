@@ -463,6 +463,70 @@ func TestPossibleToUpdatePodWithNewCert(t *testing.T) {
 	assert.Equal(t, expectedCredSpec0, extractContainerCredSpecContents(t, pod3, testName3))
 }
 
+func TestPossibleHostnameRandomization(t *testing.T) {
+	deployMethod := os.Getenv("DEPLOY_METHOD")
+	if deployMethod != "chart" {
+		t.Skip("Non chart deployment method not supported for this test")
+	}
+
+	webHookNs := os.Getenv("NAMESPACE")
+	webHookDeploymentName := os.Getenv("DEPLOYMENT_NAME")
+	webhook, err := kubeClient(t).AppsV1().Deployments(webHookNs).Get(context.Background(), webHookDeploymentName, metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	randomHostnameEnabled := false
+	for _, envVar := range webhook.Spec.Template.Spec.Containers[0].Env {
+		if strings.EqualFold(envVar.Name, "RANDOM_HOSTNAME") && strings.EqualFold(envVar.Value, "true") {
+			randomHostnameEnabled = true
+		}
+	}
+
+	if randomHostnameEnabled {
+		testName1 := "happy-path-with-hostname-randomization"
+		credSpecTemplates1 := []string{"credspec-0"}
+		templates1 := []string{"credspecs-users-rbac-role", "service-account", "sa-rbac-binding", "simple-with-gmsa"}
+
+		testConfig1, tearDownFunc1 := integrationTestSetup(t, testName1, credSpecTemplates1, templates1)
+		defer tearDownFunc1()
+
+		pod := waitForPodToComeUp(t, testConfig1.Namespace, "app="+testName1)
+		assert.NotEqual(t, testName1, pod.Spec.Hostname)
+		assert.Equal(t, 15, len(pod.Spec.Hostname))
+
+		testName2 := "hostnameset-no-hostname-randomization"
+		credSpecTemplates2 := []string{"credspec-0"}
+		templates2 := []string{"credspecs-users-rbac-role", "service-account", "sa-rbac-binding", "simple-with-gmsa-hostname"}
+
+		testConfig2, tearDownFunc2 := integrationTestSetup(t, testName2, credSpecTemplates2, templates2)
+		defer tearDownFunc2()
+
+		pod = waitForPodToComeUp(t, testConfig2.Namespace, "app="+testName2)
+		assert.Equal(t, testName2, pod.Spec.Hostname)
+
+		testName3 := "nogmsa-hostname-randomization"
+		credSpecTemplates3 := []string{"credspec-0"}
+		templates3 := []string{"credspecs-users-rbac-role", "service-account", "sa-rbac-binding", "simple-without-gmsa"}
+
+		testConfig3, tearDownFunc3 := integrationTestSetup(t, testName3, credSpecTemplates3, templates3)
+		defer tearDownFunc3()
+		pod = waitForPodToComeUp(t, testConfig3.Namespace, "app="+testName3)
+
+		assert.Equal(t, "", pod.Spec.Hostname)
+	} else {
+		testName4 := "notenabled-hostname-randomization"
+		credSpecTemplates4 := []string{"credspec-0"}
+		templates4 := []string{"credspecs-users-rbac-role", "service-account", "sa-rbac-binding", "simple-with-gmsa"}
+
+		testConfig4, tearDownFunc4 := integrationTestSetup(t, testName4, credSpecTemplates4, templates4)
+		defer tearDownFunc4()
+		pod := waitForPodToComeUp(t, testConfig4.Namespace, "app="+testName4)
+
+		assert.Equal(t, "", pod.Spec.Hostname)
+	}
+}
+
 /* Helpers */
 
 type testConfig struct {
