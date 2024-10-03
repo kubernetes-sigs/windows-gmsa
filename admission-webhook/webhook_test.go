@@ -186,7 +186,7 @@ func TestMutateCreateRequest(t *testing.T) {
 		},
 	} {
 		t.Run(testCaseName, func(t *testing.T) {
-			webhook := newWebhook(nil)
+			webhook := newWebhookWithOptions(nil, WithRandomHostname(true))
 			pod := buildPod(dummyServiceAccoutName, winOptionsFactory(), map[string]*corev1.WindowsSecurityContextOptions{dummyContainerName: winOptionsFactory()})
 
 			response, err := webhook.mutateCreateRequest(context.Background(), pod)
@@ -194,6 +194,9 @@ func TestMutateCreateRequest(t *testing.T) {
 
 			require.NotNil(t, response)
 			assert.True(t, response.Allowed)
+
+			assert.Nil(t, response.Patch)
+
 		})
 	}
 
@@ -216,7 +219,7 @@ func TestMutateCreateRequest(t *testing.T) {
 
 	runWebhookValidateOrMutateTests(t, winOptionsFactory, map[string]webhookValidateOrMutateTest{
 		"with a GMSA cred spec name, it passes and inlines the cred-spec's contents": func(t *testing.T, pod *corev1.Pod, optionsSelector winOptionsSelector, resourceKind gmsaResourceKind, resourceName string) {
-			webhook := newWebhook(kubeClientFactory())
+			webhook := newWebhookWithOptions(kubeClientFactory(), WithRandomHostname(true))
 
 			setWindowsOptions(optionsSelector(pod), dummyCredSpecName, "")
 
@@ -269,14 +272,21 @@ func TestMutateCreateRequest(t *testing.T) {
 			}
 
 			var patches []map[string]string
-			if err := json.Unmarshal(response.Patch, &patches); assert.Nil(t, err) && assert.Equal(t, len(pod.Spec.Containers), len(patches)) {
+			// one more because we're adding the hostname
+			if err := json.Unmarshal(response.Patch, &patches); assert.Nil(t, err) && assert.Equal(t, len(pod.Spec.Containers)+1, len(patches)) {
+				foundHostname := false
 				for _, patch := range patches {
 					if value, hasValue := patch["value"]; assert.True(t, hasValue) {
-						if expectedPatch, present := expectedPatches[value]; assert.True(t, present, "value %s not found in expected patches", value) {
+						if patch["path"] == "/spec/hostname" {
+							foundHostname = true
+							assert.Equal(t, "add", patch["op"])
+							assert.Equal(t, 15, len(value))
+						} else if expectedPatch, present := expectedPatches[value]; assert.True(t, present, "value %s not found in expected patches", value) {
 							assert.Equal(t, expectedPatch, patch)
 						}
 					}
 				}
+				assert.True(t, foundHostname)
 			}
 		},
 
@@ -421,8 +431,11 @@ func TestDefaultWebhookConfig(t *testing.T) {
 
 func TestSetWebhookConfig(t *testing.T) {
 	expectedCertReload := true
-	webhook := newWebhookWithOptions(nil, WithCertReload(expectedCertReload))
+	expectedRandomHostname := true
+	randomHostname := true
+	webhook := newWebhookWithOptions(nil, WithCertReload(expectedCertReload), WithRandomHostname(randomHostname))
 	assert.Equal(t, expectedCertReload, webhook.config.EnableCertReload)
+	assert.Equal(t, expectedRandomHostname, webhook.config.EnableRandomHostName)
 }
 
 func TestEqualStringPointers(t *testing.T) {

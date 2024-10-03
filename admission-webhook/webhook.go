@@ -13,6 +13,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/sirupsen/logrus"
 	admissionV1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -48,7 +50,8 @@ type podAdmissionError struct {
 }
 
 type WebhookConfig struct {
-	EnableCertReload bool
+	EnableCertReload     bool
+	EnableRandomHostName bool
 }
 
 type WebhookOption func(*WebhookConfig)
@@ -59,12 +62,18 @@ func WithCertReload(enabled bool) WebhookOption {
 	}
 }
 
+func WithRandomHostname(enabled bool) WebhookOption {
+	return func(cfg *WebhookConfig) {
+		cfg.EnableRandomHostName = enabled
+	}
+}
+
 func newWebhook(client kubeClientInterface) *webhook {
 	return newWebhookWithOptions(client)
 }
 
 func newWebhookWithOptions(client kubeClientInterface, options ...WebhookOption) *webhook {
-	config := &WebhookConfig{EnableCertReload: false}
+	config := &WebhookConfig{EnableCertReload: false, EnableRandomHostName: false}
 
 	for _, option := range options {
 		option(config)
@@ -393,6 +402,23 @@ func (webhook *webhook) mutateCreateRequest(ctx context.Context, pod *corev1.Pod
 	admissionResponse := &admissionV1.AdmissionResponse{Allowed: true}
 
 	if len(patches) != 0 {
+		// pods are GMSA related, we will need further check if we need to randomize the hostname
+		hostName := pod.Spec.Hostname
+		// Patch the hostname only if it is not empty
+		if webhook.config.EnableRandomHostName {
+			if hostName == "" {
+				hostName = generateUUID()
+				patches = append(patches, map[string]string{
+					"op":    "add",
+					"path":  "/spec/hostname",
+					"value": hostName,
+				})
+			} else {
+				// This will not happan in GMSA scenario, but added for completeness, just in case
+				return nil, &podAdmissionError{error: fmt.Errorf("can not set hostname in spec and also inidcating random hostname in ENV")}
+			}
+		}
+
 		patchesBytes, err := json.Marshal(patches)
 		if err != nil {
 			return nil, &podAdmissionError{error: fmt.Errorf("unable to marshall patch JSON %v: %v", patches, err), pod: pod, code: http.StatusInternalServerError}
@@ -536,4 +562,12 @@ func (ln tcpKeepAliveListener) Accept() (net.Conn, error) {
 	tc.SetKeepAlive(true)
 	tc.SetKeepAlivePeriod(3 * time.Minute)
 	return tc, nil
+}
+
+func generateUUID() string {
+	// Generate a new UUID
+	id := uuid.New()
+	// Convert to string and get the first 8 characters in lower case
+	shortUUID := strings.ToLower(id.String()[:15])
+	return shortUUID
 }

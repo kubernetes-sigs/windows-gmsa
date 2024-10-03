@@ -22,7 +22,12 @@ func main() {
 		panic(err)
 	}
 
-	webhook := newWebhookWithOptions(kubeClient, WithCertReload(*enableCertReload))
+	options := []WebhookOption{WithCertReload(*enableCertReload)}
+
+	randomHostname := env_bool("RANDOM_HOSTNAME")
+	options = append(options, WithRandomHostname(randomHostname))
+
+	webhook := newWebhookWithOptions(kubeClient, options...)
 
 	tlsConfig := &tlsConfig{
 		crtPath: env("TLS_CRT"),
@@ -96,6 +101,22 @@ func env_float(key string, defaultFloat float32) float32 {
 	}
 
 	return defaultFloat
+}
+
+func env_bool(key string) bool {
+	if val, found := os.LookupEnv(key); found {
+		// Convert string to bool
+		boolValue, err := strconv.ParseBool(val)
+		if err != nil {
+			logrus.Warningf("unable to parse environment variable %s with value %s to bool, use default value false", key, val)
+			return false
+		}
+
+		return boolValue
+	}
+
+	// return bool default value: false
+	return false
 }
 
 func env_int(key string, defaultInt int) int {
