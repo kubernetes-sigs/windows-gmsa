@@ -113,7 +113,7 @@ jobs:
       env:
         T: integration
         DEPLOY_METHOD: chart
-  integration-rotation-enabled:
+  integration-optional-features:
     runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v4
@@ -126,5 +126,5 @@ jobs:
       env:
         T: integration
         DEPLOY_METHOD: chart
-        HELM_INSTALL_FLAGS_FLAGS: --set certificates.certReload.enabled=true
+        HELM_INSTALL_FLAGS_FLAGS: --set certificates.certReload.enabled=true, --set randomHostname=true
 

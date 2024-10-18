@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"testing"
 )
@@ -85,4 +86,61 @@ func Test_env_int(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_env_bool(t *testing.T) {
+	tests := []struct {
+		name   string
+		envkey string
+		envval string
+		want   bool
+	}{
+		{
+			name:   "Environment variable set to true",
+			envkey: "TEST_ENV_BOOL",
+			envval: "true",
+			want:   true,
+		},
+		{
+			name:   "Environment variable set to false",
+			envkey: "TEST_ENV_BOOL",
+			envval: "false",
+			want:   false,
+		},
+		{
+			name:   "Environment variable not set",
+			envkey: "TEST_ENV_BOOL",
+			envval: "",
+			want:   false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.envval != "" {
+				os.Setenv(tt.envkey, tt.envval)
+			} else {
+				os.Unsetenv(tt.envkey)
+			}
+			if got := env_bool(tt.envkey); got != tt.want {
+				t.Errorf("env_bool() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+
+	envkey := "TEST_ENV_BOOL"
+	envVal := "invalid"
+	// Test panic
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("The code did not panic")
+		} else {
+			t.Logf("Recovered from panic: %v", r)
+			if r.(error).Error() != fmt.Sprintf("unable to parse environment variable %s with value %s to bool", envkey, envVal) {
+				t.Errorf("Unexpected panic message: %v", r)
+			}
+		}
+	}()
+
+	os.Setenv(envkey, envVal)
+	env_bool("TEST_ENV_BOOL")
 }

@@ -186,7 +186,7 @@ func TestMutateCreateRequest(t *testing.T) {
 		},
 	} {
 		t.Run(testCaseName, func(t *testing.T) {
-			webhook := newWebhook(nil)
+			webhook := newWebhookWithOptions(nil, WithRandomHostname(false))
 			pod := buildPod(dummyServiceAccoutName, winOptionsFactory(), map[string]*corev1.WindowsSecurityContextOptions{dummyContainerName: winOptionsFactory()})
 
 			response, err := webhook.mutateCreateRequest(context.Background(), pod)
@@ -194,8 +194,85 @@ func TestMutateCreateRequest(t *testing.T) {
 
 			require.NotNil(t, response)
 			assert.True(t, response.Allowed)
+
+			assert.Nil(t, response.Patch)
+
 		})
 	}
+
+	for testCaseName, winOptionsFactory := range map[string]func() *corev1.WindowsSecurityContextOptions{
+		"with random hostname env set and empty GMSA settings, it passes and does nothing": func() *corev1.WindowsSecurityContextOptions {
+			return &corev1.WindowsSecurityContextOptions{}
+		},
+		"with random hostname env set and no GMSA settings, it passes and does nothing": func() *corev1.WindowsSecurityContextOptions {
+			return nil
+		},
+	} {
+		t.Run(testCaseName, func(t *testing.T) {
+			webhook := newWebhookWithOptions(nil, WithRandomHostname(true))
+			pod := buildPod(dummyServiceAccoutName, winOptionsFactory(), map[string]*corev1.WindowsSecurityContextOptions{dummyContainerName: winOptionsFactory()})
+
+			response, err := webhook.mutateCreateRequest(context.Background(), pod)
+			assert.Nil(t, err)
+
+			require.NotNil(t, response)
+			assert.True(t, response.Allowed)
+
+			assert.Nil(t, response.Patch)
+
+		})
+	}
+
+	testCaseName, winOptionsFactory1 := "with random hostname env set and dummy GMSA settings, it passes and set random hostname", func() *corev1.WindowsSecurityContextOptions {
+		dummyCredSpecNameVar := dummyCredSpecName
+		dummyCredSpecContentsVar := dummyCredSpecContents
+		return &corev1.WindowsSecurityContextOptions{GMSACredentialSpecName: &dummyCredSpecNameVar, GMSACredentialSpec: &dummyCredSpecContentsVar}
+	}
+	t.Run(testCaseName, func(t *testing.T) {
+		webhook := newWebhookWithOptions(nil, WithRandomHostname(true))
+		pod := buildPod(dummyServiceAccoutName, winOptionsFactory1(), map[string]*corev1.WindowsSecurityContextOptions{dummyContainerName: winOptionsFactory1()})
+
+		response, err := webhook.mutateCreateRequest(context.Background(), pod)
+		assert.Nil(t, err)
+
+		require.NotNil(t, response)
+		assert.True(t, response.Allowed)
+
+		var patches []map[string]string
+		// one more because we're adding the hostname
+		if err := json.Unmarshal(response.Patch, &patches); assert.Nil(t, err) && assert.Equal(t, 1, len(patches)) {
+			foundHostname := false
+			for _, patch := range patches {
+				if value, hasValue := patch["value"]; assert.True(t, hasValue) {
+					if patch["path"] == "/spec/hostname" {
+						foundHostname = true
+						assert.Equal(t, "add", patch["op"])
+						assert.Equal(t, 15, len(value))
+					}
+				}
+			}
+			assert.True(t, foundHostname)
+		}
+	})
+
+	testCaseName, winOptionsFactory1 = "with random hostname env set and dummy GMSA settings and hostname set in spec, it passes and do nothing", func() *corev1.WindowsSecurityContextOptions {
+		dummyCredSpecNameVar := dummyCredSpecName
+		dummyCredSpecContentsVar := dummyCredSpecContents
+		return &corev1.WindowsSecurityContextOptions{GMSACredentialSpecName: &dummyCredSpecNameVar, GMSACredentialSpec: &dummyCredSpecContentsVar}
+	}
+	t.Run(testCaseName, func(t *testing.T) {
+		webhook := newWebhookWithOptions(nil, WithRandomHostname(true))
+		dummyPodNameVar := dummyPodName
+		pod := buildPodWithHostName(dummyServiceAccoutName, &dummyPodNameVar, winOptionsFactory1(), map[string]*corev1.WindowsSecurityContextOptions{dummyContainerName: winOptionsFactory1()})
+
+		response, err := webhook.mutateCreateRequest(context.Background(), pod)
+		assert.Nil(t, err)
+
+		require.NotNil(t, response)
+		assert.True(t, response.Allowed)
+
+		assert.Nil(t, response.Patch)
+	})
 
 	kubeClientFactory := func() *dummyKubeClient {
 		return &dummyKubeClient{
@@ -215,8 +292,8 @@ func TestMutateCreateRequest(t *testing.T) {
 	}
 
 	runWebhookValidateOrMutateTests(t, winOptionsFactory, map[string]webhookValidateOrMutateTest{
-		"with a GMSA cred spec name, it passes and inlines the cred-spec's contents": func(t *testing.T, pod *corev1.Pod, optionsSelector winOptionsSelector, resourceKind gmsaResourceKind, resourceName string) {
-			webhook := newWebhook(kubeClientFactory())
+		"with random hostname env and a GMSA cred spec name, it passes and inlines the cred-spec's contents and generate random hostname": func(t *testing.T, pod *corev1.Pod, optionsSelector winOptionsSelector, resourceKind gmsaResourceKind, resourceName string) {
+			webhook := newWebhookWithOptions(kubeClientFactory(), WithRandomHostname(true))
 
 			setWindowsOptions(optionsSelector(pod), dummyCredSpecName, "")
 
@@ -269,17 +346,25 @@ func TestMutateCreateRequest(t *testing.T) {
 			}
 
 			var patches []map[string]string
-			if err := json.Unmarshal(response.Patch, &patches); assert.Nil(t, err) && assert.Equal(t, len(pod.Spec.Containers), len(patches)) {
+			// len(pod.Spec.Containers)+1 because we're adding the hostname
+			if err := json.Unmarshal(response.Patch, &patches); assert.Nil(t, err) && assert.Equal(t, len(pod.Spec.Containers)+1, len(patches)) {
+				foundHostname := false
 				for _, patch := range patches {
 					if value, hasValue := patch["value"]; assert.True(t, hasValue) {
-						if expectedPatch, present := expectedPatches[value]; assert.True(t, present, "value %s not found in expected patches", value) {
+						if patch["path"] == "/spec/hostname" {
+							foundHostname = true
+							assert.Equal(t, "add", patch["op"])
+							assert.Equal(t, 15, len(value))
+						} else if expectedPatch, present := expectedPatches[value]; assert.True(t, present, "value %s not found in expected patches", value) {
 							assert.Equal(t, expectedPatch, patch)
 						}
 					}
 				}
+				assert.True(t, foundHostname)
 			}
 		},
 
+		// random hostname env not set in the following cases, and validated no hostname is set (implicitly)
 		"it the cred spec's contents are already set, along with its name, it passes and doesn't overwrite the provided contents": func(t *testing.T, pod *corev1.Pod, optionsSelector winOptionsSelector, _ gmsaResourceKind, _ string) {
 			webhook := newWebhook(kubeClientFactory())
 
@@ -421,8 +506,11 @@ func TestDefaultWebhookConfig(t *testing.T) {
 
 func TestSetWebhookConfig(t *testing.T) {
 	expectedCertReload := true
-	webhook := newWebhookWithOptions(nil, WithCertReload(expectedCertReload))
+	expectedRandomHostname := true
+	randomHostname := true
+	webhook := newWebhookWithOptions(nil, WithCertReload(expectedCertReload), WithRandomHostname(randomHostname))
 	assert.Equal(t, expectedCertReload, webhook.config.EnableCertReload)
+	assert.Equal(t, expectedRandomHostname, webhook.config.EnableRandomHostName)
 }
 
 func TestEqualStringPointers(t *testing.T) {
