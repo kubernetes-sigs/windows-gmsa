@@ -57,6 +57,8 @@ spec:
               value: "{{ .Values.burst }}"
             - name: QPS
               value: "{{ .Values.qps }}"
+            - name: RANDOM_HOSTNAME
+              value: "{{ .Values.randomHostname }}"
           {{- if .Values.securityContext }}
           securityContext: {{ toYaml .Values.securityContext | nindent 12 }}
           {{- end }}

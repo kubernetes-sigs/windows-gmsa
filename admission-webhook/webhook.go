@@ -13,6 +13,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/sirupsen/logrus"
 	admissionV1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -48,7 +50,8 @@ type podAdmissionError struct {
 }
 
 type WebhookConfig struct {
-	EnableCertReload bool
+	EnableCertReload     bool
+	EnableRandomHostName bool
 }
 
 type WebhookOption func(*WebhookConfig)
@@ -59,12 +62,18 @@ func WithCertReload(enabled bool) WebhookOption {
 	}
 }
 
+func WithRandomHostname(enabled bool) WebhookOption {
+	return func(cfg *WebhookConfig) {
+		cfg.EnableRandomHostName = enabled
+	}
+}
+
 func newWebhook(client kubeClientInterface) *webhook {
 	return newWebhookWithOptions(client)
 }
 
 func newWebhookWithOptions(client kubeClientInterface, options ...WebhookOption) *webhook {
-	config := &WebhookConfig{EnableCertReload: false}
+	config := &WebhookConfig{EnableCertReload: false, EnableRandomHostName: false}
 
 	for _, option := range options {
 		option(config)
@@ -358,9 +367,11 @@ func compareCredSpecContents(fromResource, fromCRD string) (bool, error) {
 // mutateCreateRequest inlines the requested GMSA's into the pod's and containers' `WindowsSecurityOptions` structs.
 func (webhook *webhook) mutateCreateRequest(ctx context.Context, pod *corev1.Pod) (*admissionV1.AdmissionResponse, *podAdmissionError) {
 	var patches []map[string]string
+	hasGMSA := false
 
 	if err := iterateOverWindowsSecurityOptions(pod, func(windowsOptions *corev1.WindowsSecurityContextOptions, resourceKind gmsaResourceKind, resourceName string, containerIndex int) *podAdmissionError {
 		if credSpecName := windowsOptions.GMSACredentialSpecName; credSpecName != nil {
+			hasGMSA = true
 			// if the user has pre-set the GMSA's contents, we won't override it - it'll be down
 			// to the validation endpoint to make sure the contents actually are what they should
 			if credSpecContents := windowsOptions.GMSACredentialSpec; credSpecContents == nil {
@@ -390,8 +401,23 @@ func (webhook *webhook) mutateCreateRequest(ctx context.Context, pod *corev1.Pod
 		return nil, err
 	}
 
-	admissionResponse := &admissionV1.AdmissionResponse{Allowed: true}
+	if hasGMSA && webhook.config.EnableRandomHostName {
+		// Pods are GMSA related, Env enabled, patch the hostname only if it is empty
+		hostName := pod.Spec.Hostname
+		if hostName == "" {
+			hostName = generateUUID()
+			patches = append(patches, map[string]string{
+				"op":    "add",
+				"path":  "/spec/hostname",
+				"value": hostName,
+			})
+		} else {
+			// Will honor the hostname set in the spec, print out a message
+			logrus.Warnf("hostname is set in spec and will be hornored instead of being randomized")
+		}
+	}
 
+	admissionResponse := &admissionV1.AdmissionResponse{Allowed: true}
 	if len(patches) != 0 {
 		patchesBytes, err := json.Marshal(patches)
 		if err != nil {
@@ -536,4 +562,12 @@ func (ln tcpKeepAliveListener) Accept() (net.Conn, error) {
 	tc.SetKeepAlive(true)
 	tc.SetKeepAlivePeriod(3 * time.Minute)
 	return tc, nil
+}
+
+func generateUUID() string {
+	// Generate a new UUID
+	id := uuid.New()
+	// Convert to string and get the first 15 characters in lower case
+	shortUUID := strings.ToLower(id.String()[:15])
+	return shortUUID
 }

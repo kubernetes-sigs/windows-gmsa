@@ -51,3 +51,4 @@ securityContext: {}
 tolerations: []
 qps: 30.0
 burst: 50
+randomHostname: false
