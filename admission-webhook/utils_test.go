@@ -2,7 +2,14 @@ package main
 
 import (
 	"context"
+	crand "crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
+	"math/big"
 	"math/rand"
+	"os"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -105,4 +112,53 @@ func shuffleContainers(a []corev1.Container) {
 		a[j] = a[i]
 		a[i] = tmp
 	}
+}
+
+func GenerateTestCertAndKey() {
+	// Generate a 2048-bit RSA private key
+	priv, err := rsa.GenerateKey(crand.Reader, 2048)
+	if err != nil {
+		panic(err)
+	}
+
+	// Create a certificate template
+	certTemplate := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject: pkix.Name{
+			Organization: []string{"test"},
+		},
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().AddDate(1, 0, 0), // Valid for 1 year
+		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		BasicConstraintsValid: true,
+	}
+
+	// Create the certificate
+	certDER, err := x509.CreateCertificate(crand.Reader, certTemplate, certTemplate, &priv.PublicKey, priv)
+	if err != nil {
+		panic(err)
+	}
+
+	err = os.Mkdir("testdata", 0755)
+	if err != nil {
+		panic(err)
+	}
+
+	// Write the certificate to a PEM file
+	certFile, err := os.Create("testdata/cert.pem")
+	if err != nil {
+		panic(err)
+	}
+	pem.Encode(certFile, &pem.Block{Type: "CERTIFICATE", Bytes: certDER})
+	certFile.Close()
+
+	// Write the private key to a PEM file
+	keyFile, err := os.Create("testdata/key.pem")
+	if err != nil {
+		panic(err)
+	}
+	keyBytes := x509.MarshalPKCS1PrivateKey(priv)
+	pem.Encode(keyFile, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: keyBytes})
+	keyFile.Close()
 }
