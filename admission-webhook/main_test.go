@@ -148,5 +148,6 @@ func Test_env_bool(t *testing.T) {
 func TestMain(m *testing.M) {
 	GenerateTestCertAndKey()
 	code := m.Run() // run tests
+	ClearTestdata()
 	os.Exit(code)
 }

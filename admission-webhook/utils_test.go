@@ -162,3 +162,7 @@ func GenerateTestCertAndKey() {
 	pem.Encode(keyFile, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: keyBytes})
 	keyFile.Close()
 }
+
+func ClearTestdata() {
+	os.RemoveAll("testdata")
+}
