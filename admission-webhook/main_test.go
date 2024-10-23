@@ -144,3 +144,10 @@ func Test_env_bool(t *testing.T) {
 	os.Setenv(envkey, envVal)
 	env_bool("TEST_ENV_BOOL")
 }
+
+func TestMain(m *testing.M) {
+	GenerateTestCertAndKey()
+	code := m.Run() // run tests
+	ClearTestdata()
+	os.Exit(code)
+}
