@@ -15,7 +15,13 @@ func main() {
 	initLogrus()
 
 	enableCertReload := flag.Bool("cert-reload", false, "enable certificate reload")
+	v := flag.Bool("version", false, "show version")
 	flag.Parse()
+
+	if *v {
+		fmt.Printf("windows-gmsa-webhook v%s\n", getVersion())
+		os.Exit(0)
+	}
 
 	kubeClient, err := createKubeClient()
 	if err != nil {
