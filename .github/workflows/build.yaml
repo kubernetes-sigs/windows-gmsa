@@ -10,50 +10,50 @@ on:
 
 jobs:
   unit:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@v4
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.22'
+        go-version: '1.23'
     - id: test-runner
       uses: ./.github/actions/tests
       env:
         T: unit
   integration:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@v4
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.22'
+        go-version: '1.23'
     - id: test-runner
       uses: ./.github/actions/tests
       env:
         T: integration
   deploy-method-download:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@v4
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.22'
+        go-version: '1.23'
     - id: test-runner
       uses: ./.github/actions/tests
       env:
         T: integration
         DEPLOY_METHOD: download
   tolerate-control-plane:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@v4
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.22'
+        go-version: '1.23'
     - id: test-runner
       uses: ./.github/actions/tests
       env:
@@ -61,38 +61,38 @@ jobs:
         NUM_NODES: 0
         EXTRA_GMSA_DEPLOY_ARGS: --tolerate-master
   dry-run-deploy:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@v4
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.22'
+        go-version: '1.23'
     - id: test-runner
       uses: ./.github/actions/tests
       env:
         T: dry_run_deploy
   without-envsubst:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@v4
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.22'
+        go-version: '1.23'
     - id: test-runner
       uses: ./.github/actions/tests
       env:
         T: integration
         WITHOUT_ENVSUBST: 1
   without-envsubst-tolerations:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@v4
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.22'
+        go-version: '1.23'
     - id: test-runner
       uses: ./.github/actions/tests
       env:
@@ -101,26 +101,26 @@ jobs:
         WITHOUT_ENVSUBST: 1
         EXTRA_GMSA_DEPLOY_ARGS: --tolerate-master
   chart-integration:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@v4
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.22'
+        go-version: '1.23'
     - id: test-runner
       uses: ./.github/actions/tests
       env:
         T: integration
         DEPLOY_METHOD: chart
   integration-optional-features:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@v4
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.22'
+        go-version: '1.23'
     - id: test-runner
       uses: ./.github/actions/tests
       env:
