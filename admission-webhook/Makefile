@@ -3,7 +3,7 @@ SHELL := /bin/bash
 
 WEBHOOK_ROOT := $(CURDIR)
 
-REGISTRY ?= sigwindowstools
+REGISTRY ?= registry.k8s.io/gmsa-webhook
 STAGING_REGISTRY ?= gcr.io/k8s-staging-gmsa-webhook
 IMAGE_NAME ?= k8s-gmsa-webhook
 TAG ?=  $(shell git describe --tags --always `git rev-parse HEAD`)
