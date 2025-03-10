@@ -2,7 +2,7 @@ module github.com/kubernetes-sigs/windows-gmsa/admission-webhook
 
 go 1.23.0
 
-toolchain go1.23.4
+toolchain go1.23.7
 
 require (
 	github.com/fsnotify/fsnotify v1.8.0
