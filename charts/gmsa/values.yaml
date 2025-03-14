@@ -29,7 +29,7 @@ containerPort: "443"
 
 image:
   repository: registry.k8s.io/gmsa-webhook/k8s-gmsa-webhook
-  tag: v0.12.1
+  tag: v0.13.0
   imagePullPolicy: IfNotPresent
 
 # If true, will add os fields to pod specs for K8s versions where feature is in beta (v1.24+)
