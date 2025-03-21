@@ -13,3 +13,16 @@ rules:
   - apiGroups: ["authorization.k8s.io"]
     resources: ["localsubjectaccessreviews"]
     verbs: ["create"]
+---
+# allow visibility of gmsacredentialspecs through built-in "view" role
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: {{ .Release.Name }}-viewer-role
+  labels:
+    {{ include "gmsa.chartref" . }}
+    rbac.authorization.k8s.io/aggregate-to-view: "true"
+rules:
+  - apiGroups: ["windows.k8s.io"]
+    resources: ["gmsacredentialspecs"]
+    verbs: ["get", "list", "watch"]
