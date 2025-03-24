@@ -14,6 +14,7 @@ rules:
     resources: ["localsubjectaccessreviews"]
     verbs: ["create"]
 ---
+{{- if .Values.viewerRole }}
 # allow visibility of gmsacredentialspecs through built-in "view" role
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
@@ -26,3 +27,4 @@ rules:
   - apiGroups: ["windows.k8s.io"]
     resources: ["gmsacredentialspecs"]
     verbs: ["get", "list", "watch"]
+{{- end }}

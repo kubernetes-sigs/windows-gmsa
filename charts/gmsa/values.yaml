@@ -46,6 +46,10 @@ podDisruptionBudget:
   # maxUnavailable: 1
 
 podSecurityContext: {}
+
+# Enable aggregation of GMSA resources to the built-in view role
+viewerRole: false
+
 replicaCount: 2
 securityContext: {}
 tolerations: []
