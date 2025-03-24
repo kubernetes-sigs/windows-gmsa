@@ -29,29 +29,30 @@ helm uninstall gmsa -n kube-system
 
 The following table lists the configurable parameters of the latest GMSA chart and default values.
 
-| Parameter                                             | Description                                                       | Default                                               |
-|-------------------------------------------------------|-------------------------------------------------------------------|-------------------------------------------------------|
-| `certificates.certManager.enabled`                    | enable cert manager integration                                   | `true`                                                |
-| `certificates.certManager.version`                    | version of cert manager                                           |                                                       |
-| `certificates.caBundle`                               | cert-manager disabled, add self-signed ca.crt in base64 format    |                                                       |
-| `certificates.secretName`                             | cert-manager disabled, upload certs data as k8s secretName        | `gmsa-server-cert`                                    |
-| `certificates.certReload.enabled`                     | enable cert reload on changes                                     | `false`                                    |
-| `credential.enabled`                                  | enable creation of GMSA Credential                                | `true`                                                |
-| `credential.domainJoinConfig.dnsName`                 | DNS Domain Name                                                   |                                                       |
-| `credential.domainJoinConfig.dnsTreeName`             | DNS Domain Name Root                                              |                                                       |
-| `credential.domainJoinConfig.guid`                    | GUID                                                              |                                                       |
-| `credential.domainJoinConfig.machineAccountName`      | username of the GMSA account                                      |                                                       |
-| `credential.domainJoinConfig.netBiosName`             | NETBIOS Domain Name                                               |                                                       |
-| `credential.domainJoinConfig.sid`                     | SID                                                               |                                                       |
-| `credential.hostAccountConfig.pluginGUID`             | GUID of CCG Plugin                                                |                                                       |
-| `credential.hostAccountConfigg.portableCcgVersion`    | Version of CCG Plugin                                             | `1`                                                   |
-| `credential.hostAccountConfig.pluginInput`            | Input to CCG Plugin                                               |                                                       |
-| `image.repository`                                    | image repository                                                  | `registry.k8s.io/gmsa-webhook/k8s-gmsa-webhook`       |
-| `image.tag`                                           | image tag                                                         | `v0.4.0`                                              |
-| `image.imagePullPolicy`                               | image pull policy                                                 | `IfNotPresent`                                        |
-| `global.systemDefaultRegistry`                        | container registry                                                |                                                       |
-| `tolerations`                                         | tolerations                                                       | []                                                    |
-! `setPodOs`                                            | Enables setting of `OS` field on Pod for supported K8s versions   | `true`                                                |
+| Parameter                                          | Description                                                           | Default                                         |
+| -------------------------------------------------- | --------------------------------------------------------------------- | ----------------------------------------------- |
+| `certificates.certManager.enabled`                 | enable cert manager integration                                       | `true`                                          |
+| `certificates.certManager.version`                 | version of cert manager                                               |                                                 |
+| `certificates.caBundle`                            | cert-manager disabled, add self-signed ca.crt in base64 format        |                                                 |
+| `certificates.secretName`                          | cert-manager disabled, upload certs data as k8s secretName            | `gmsa-server-cert`                              |
+| `certificates.certReload.enabled`                  | enable cert reload on changes                                         | `false`                                         |
+| `credential.enabled`                               | enable creation of GMSA Credential                                    | `true`                                          |
+| `credential.domainJoinConfig.dnsName`              | DNS Domain Name                                                       |                                                 |
+| `credential.domainJoinConfig.dnsTreeName`          | DNS Domain Name Root                                                  |                                                 |
+| `credential.domainJoinConfig.guid`                 | GUID                                                                  |                                                 |
+| `credential.domainJoinConfig.machineAccountName`   | username of the GMSA account                                          |                                                 |
+| `credential.domainJoinConfig.netBiosName`          | NETBIOS Domain Name                                                   |                                                 |
+| `credential.domainJoinConfig.sid`                  | SID                                                                   |                                                 |
+| `credential.hostAccountConfig.pluginGUID`          | GUID of CCG Plugin                                                    |                                                 |
+| `credential.hostAccountConfigg.portableCcgVersion` | Version of CCG Plugin                                                 | `1`                                             |
+| `credential.hostAccountConfig.pluginInput`         | Input to CCG Plugin                                                   |                                                 |
+| `image.repository`                                 | image repository                                                      | `registry.k8s.io/gmsa-webhook/k8s-gmsa-webhook` |
+| `image.tag`                                        | image tag                                                             | `v0.4.0`                                        |
+| `image.imagePullPolicy`                            | image pull policy                                                     | `IfNotPresent`                                  |
+| `global.systemDefaultRegistry`                     | container registry                                                    |                                                 |
+| `tolerations`                                      | tolerations                                                           | []                                              |
+| `setPodOs`                                         | Enables setting of `OS` field on Pod for supported K8s versions       | `true`                                          |
+| `viewerRole`                                       | Enable aggregation of `gmsacredentialspecs` to the built-in view role | `false`                                         |
 
 ## troubleshooting
 
