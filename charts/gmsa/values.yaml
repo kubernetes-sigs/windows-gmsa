@@ -13,7 +13,8 @@ certificates:
 
 credential:
   enabled: false
-  hostAccountConfig: {}
+  hostAccountConfig:
+    {}
     # pluginGUID: "" # CCG Plugin GUID
     # portableCcgVersion: "1" # This needs to equal the current version of CCG which right now is '1'
     # pluginInput: "" # Format of this field is dependent upon specific CCG Plugin
@@ -56,3 +57,9 @@ tolerations: []
 qps: 30.0
 burst: 50
 randomHostname: false
+
+# override kubernetes server version rather than rely on kubectl / helm Capabilities.KubeVersion.*
+# - sometimes client kubectl might be version skewed from target cluster
+overrideKubeVersion:
+  enabled: true
+  version: v1.29.16

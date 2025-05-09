@@ -25,6 +25,9 @@ webhooks:
     failurePolicy: Fail
     admissionReviewVersions: ["v1", "v1beta1"]
     sideEffects: None
+    {{- if ge ((include "kube.versionMinor" .) | int) 30 }}
+    {{- (include "webhook.matchConditions" .) | nindent 4 }}
+    {{- end }}
     # don't run on ${NAMESPACE}
     namespaceSelector:
       matchExpressions:

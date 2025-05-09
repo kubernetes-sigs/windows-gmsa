@@ -45,3 +45,30 @@ apiVersion: cert-manager.io/v1
 INSERT_CERTIFICATE_FROM_SECRET
 {{- end -}}
 {{- end }}
+
+# https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchconditions
+{{- define "webhook.matchConditions" -}}
+matchConditions:
+  - name: 'has-gmsa-credspec'
+    expression: |
+      object.spec.containers.exists(
+        container,
+        has(container.securityContext) &&
+        has(container.securityContext.windowsOptions) &&
+        has(container.securityContext.windowsOptions.gmsaCredentialSpecName) &&
+        size(container.securityContext.windowsOptions.gmsaCredentialSpecName) >= 1
+      )
+{{- end -}}
+
+{{- define "kube.versionMinor" -}}
+{{- $v := .Capabilities.KubeVersion.Version -}}
+{{- if (and .Values.overrideKubeVersion.enabled .Values.overrideKubeVersion.version) -}}
+{{- $v = .Values.overrideKubeVersion.version -}}
+{{- end -}}
+{{- $kubeVersion := $v | replace "v" "" | split "." -}}
+{{- if eq (len $kubeVersion) 3 -}}
+{{- $kubeVersion._1 -}}
+{{- else -}}
+{{- fail (printf "Invalid KubeVersion: %s" $v) -}}
+{{- end -}}
+{{- end -}}
