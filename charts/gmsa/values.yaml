@@ -61,5 +61,5 @@ randomHostname: false
 # override kubernetes server version rather than rely on kubectl / helm Capabilities.KubeVersion.*
 # - sometimes client kubectl might be version skewed from target cluster
 overrideKubeVersion:
-  enabled: true
+  enabled: false
   version: v1.29.16
