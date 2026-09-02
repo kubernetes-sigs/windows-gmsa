@@ -382,8 +382,11 @@ func (webhook *webhook) mutateCreateRequest(ctx context.Context, pod *corev1.Pod
 				}
 
 				partialPath := ""
-				if resourceKind == containerKind {
+				switch resourceKind {
+				case containerKind:
 					partialPath = fmt.Sprintf("/containers/%d", containerIndex)
+				case initContainerKind:
+					partialPath = fmt.Sprintf("/initContainers/%d", containerIndex)
 				}
 
 				// worth noting that this JSON patch is guaranteed to work since we know at this point
