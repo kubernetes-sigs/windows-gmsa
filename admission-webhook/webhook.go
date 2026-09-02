@@ -447,12 +447,12 @@ func validateUpdateRequest(pod, oldPod *corev1.Pod) (*admissionV1.AdmissionRespo
 				oldWindowsOptions = oldPod.Spec.SecurityContext.WindowsOptions
 			}
 		} else {
-			// it's a container; look for the same container in the old pod,
+			// it's a container or an init container; look for the same container in the old pod,
 			// lazily building the map of container names to security options if needed
 			if oldPodContainerOptions == nil {
 				oldPodContainerOptions = make(map[string]*corev1.WindowsSecurityContextOptions)
 				iterateOverWindowsSecurityOptions(oldPod, func(winOpts *corev1.WindowsSecurityContextOptions, rsrcKind gmsaResourceKind, rsrcName string, _ int) *podAdmissionError {
-					if rsrcKind == containerKind {
+					if rsrcKind != podKind {
 						oldPodContainerOptions[rsrcName] = winOpts
 					}
 					return nil
