@@ -33,8 +33,9 @@ const (
 	validate webhookOperation = "VALIDATE"
 	mutate   webhookOperation = "MUTATE"
 
-	podKind       gmsaResourceKind = "pod"
-	containerKind gmsaResourceKind = "container"
+	podKind           gmsaResourceKind = "pod"
+	containerKind     gmsaResourceKind = "container"
+	initContainerKind gmsaResourceKind = "initContainer"
 )
 
 type webhook struct {
