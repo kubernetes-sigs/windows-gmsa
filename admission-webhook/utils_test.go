@@ -73,21 +73,19 @@ func buildPod(serviceAccountName string, podWindowsOptions *corev1.WindowsSecuri
 // case a `*corev1.WindowsSecurityContextOptions` is built using that string as the name of the cred spec to use.
 // Same goes for the values of `containerNamesAndWindowsOptions`.
 func buildPodWithHostName(serviceAccountName string, hostname *string, podWindowsOptions *corev1.WindowsSecurityContextOptions, containerNamesAndWindowsOptions map[string]*corev1.WindowsSecurityContextOptions) *corev1.Pod {
-	containers := make([]corev1.Container, len(containerNamesAndWindowsOptions))
-	i := 0
-	for name, winOptions := range containerNamesAndWindowsOptions {
-		containers[i] = corev1.Container{Name: name}
-		if winOptions != nil {
-			containers[i].SecurityContext = &corev1.SecurityContext{WindowsOptions: winOptions}
-		}
-		i++
-	}
+	return buildPodWithInitContainers(serviceAccountName, hostname, podWindowsOptions, containerNamesAndWindowsOptions, nil)
+}
 
-	shuffleContainers(containers)
+// buildPodWithInitContainers is like buildPodWithHostName, but also populates `.Spec.InitContainers`
+// from `initContainerNamesAndWindowsOptions`, using the same conventions as `containerNamesAndWindowsOptions`.
+func buildPodWithInitContainers(serviceAccountName string, hostname *string, podWindowsOptions *corev1.WindowsSecurityContextOptions, containerNamesAndWindowsOptions, initContainerNamesAndWindowsOptions map[string]*corev1.WindowsSecurityContextOptions) *corev1.Pod {
+	containers := buildContainers(containerNamesAndWindowsOptions)
+	initContainers := buildContainers(initContainerNamesAndWindowsOptions)
 
 	podSpec := corev1.PodSpec{
 		ServiceAccountName: serviceAccountName,
 		Containers:         containers,
+		InitContainers:     initContainers,
 	}
 
 	if hostname != nil {
@@ -102,6 +100,25 @@ func buildPodWithHostName(serviceAccountName string, hostname *string, podWindow
 		ObjectMeta: metav1.ObjectMeta{Name: dummyPodName},
 		Spec:       podSpec,
 	}
+}
+
+// buildContainers builds a shuffled slice of containers named after the keys of
+// `namesAndWindowsOptions`, with their `.SecurityContext.WindowsOptions` field set to the
+// corresponding value.
+func buildContainers(namesAndWindowsOptions map[string]*corev1.WindowsSecurityContextOptions) []corev1.Container {
+	containers := make([]corev1.Container, len(namesAndWindowsOptions))
+	i := 0
+	for name, winOptions := range namesAndWindowsOptions {
+		containers[i] = corev1.Container{Name: name}
+		if winOptions != nil {
+			containers[i].SecurityContext = &corev1.SecurityContext{WindowsOptions: winOptions}
+		}
+		i++
+	}
+
+	shuffleContainers(containers)
+
+	return containers
 }
 
 func shuffleContainers(a []corev1.Container) {
