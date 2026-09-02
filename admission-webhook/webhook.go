@@ -495,10 +495,11 @@ func equalStringPointers(s1, s2 *string) bool {
 }
 
 // iterateOverWindowsSecurityOptions calls `f` on the pod's `.Spec.SecurityContext.WindowsOptions` field,
-// as well as over each of its container's `.SecurityContext.WindowsOptions` field.
+// as well as over each of its containers' and init containers' `.SecurityContext.WindowsOptions` field.
 // `f` can assume it only gets called with non-nil `WindowsSecurityOptions` pointers; the other
 // arguments give information on the resource owning that pointer - in particular, if that
-// resource is a container, `containerIndex` is the index of the container in the spec's list (-1 for pods).
+// resource is a container or an init container, `containerIndex` is the index of the container in the
+// spec's relevant list (`.Spec.Containers` or `.Spec.InitContainers`, respectively; -1 for pods).
 // If `f` returns an error, that breaks the loop, and the error is bubbled up.
 func iterateOverWindowsSecurityOptions(pod *corev1.Pod, f func(windowsOptions *corev1.WindowsSecurityContextOptions, resourceKind gmsaResourceKind, resourceName string, containerIndex int) *podAdmissionError) *podAdmissionError {
 	if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.WindowsOptions != nil {
@@ -510,6 +511,14 @@ func iterateOverWindowsSecurityOptions(pod *corev1.Pod, f func(windowsOptions *c
 	for i, container := range pod.Spec.Containers {
 		if container.SecurityContext != nil && container.SecurityContext.WindowsOptions != nil {
 			if err := f(container.SecurityContext.WindowsOptions, containerKind, container.Name, i); err != nil {
+				return err
+			}
+		}
+	}
+
+	for i, container := range pod.Spec.InitContainers {
+		if container.SecurityContext != nil && container.SecurityContext.WindowsOptions != nil {
+			if err := f(container.SecurityContext.WindowsOptions, initContainerKind, container.Name, i); err != nil {
 				return err
 			}
 		}
