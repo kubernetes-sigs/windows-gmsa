@@ -597,16 +597,18 @@ func runWebhookValidateOrMutateTests(t *testing.T, winOptionsFactory containerWi
 			testNameSuffix = fmt.Sprintf(" and %d extra containers", extraContainersCount)
 		}
 
-		for _, resourceKind := range []gmsaResourceKind{podKind, containerKind} {
+		for _, resourceKind := range []gmsaResourceKind{podKind, containerKind, initContainerKind} {
 			for testName, testFunc := range tests {
 				podWindowsOptions := &corev1.WindowsSecurityContextOptions{}
-				containerNamesAndWindowsOptions[dummyContainerName] = &corev1.WindowsSecurityContextOptions{}
-				pod := buildPod(dummyServiceAccoutName, podWindowsOptions, containerNamesAndWindowsOptions)
 
+				var pod *corev1.Pod
 				var optionsSelector winOptionsSelector
 				var resourceName string
 				switch resourceKind {
 				case podKind:
+					containerNamesAndWindowsOptions[dummyContainerName] = &corev1.WindowsSecurityContextOptions{}
+					pod = buildPod(dummyServiceAccoutName, podWindowsOptions, containerNamesAndWindowsOptions)
+
 					optionsSelector = func(pod *corev1.Pod) *corev1.WindowsSecurityContextOptions {
 						if pod != nil && pod.Spec.SecurityContext != nil {
 							return pod.Spec.SecurityContext.WindowsOptions
@@ -616,9 +618,34 @@ func runWebhookValidateOrMutateTests(t *testing.T, winOptionsFactory containerWi
 
 					resourceName = dummyPodName
 				case containerKind:
+					containerNamesAndWindowsOptions[dummyContainerName] = &corev1.WindowsSecurityContextOptions{}
+					pod = buildPod(dummyServiceAccoutName, podWindowsOptions, containerNamesAndWindowsOptions)
+
 					optionsSelector = func(pod *corev1.Pod) *corev1.WindowsSecurityContextOptions {
 						if pod != nil {
 							for _, container := range pod.Spec.Containers {
+								if container.Name == dummyContainerName {
+									if container.SecurityContext != nil {
+										return container.SecurityContext.WindowsOptions
+									}
+									return nil
+								}
+							}
+						}
+						return nil
+					}
+
+					resourceName = dummyContainerName
+				case initContainerKind:
+					// the dummy container under test is an init container here, so it must not also
+					// be present amongst the (regular) extra containers.
+					delete(containerNamesAndWindowsOptions, dummyContainerName)
+					initContainerNamesAndWindowsOptions := map[string]*corev1.WindowsSecurityContextOptions{dummyContainerName: {}}
+					pod = buildPodWithInitContainers(dummyServiceAccoutName, nil, podWindowsOptions, containerNamesAndWindowsOptions, initContainerNamesAndWindowsOptions)
+
+					optionsSelector = func(pod *corev1.Pod) *corev1.WindowsSecurityContextOptions {
+						if pod != nil {
+							for _, container := range pod.Spec.InitContainers {
 								if container.Name == dummyContainerName {
 									if container.SecurityContext != nil {
 										return container.SecurityContext.WindowsOptions
