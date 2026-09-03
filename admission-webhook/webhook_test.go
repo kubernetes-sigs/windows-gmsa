@@ -171,7 +171,7 @@ func TestValidateCreateRequest(t *testing.T) {
 
 			assert.Nil(t, response)
 
-			assertPodAdmissionErrorContains(t, err, pod, http.StatusNotFound, dummyError.Error())
+			assertPodAdmissionErrorContains(t, err, pod, http.StatusNotFound, "%s", dummyError.Error())
 		},
 	})
 }
@@ -426,7 +426,7 @@ func TestMutateCreateRequest(t *testing.T) {
 
 			assert.Nil(t, response)
 
-			assertPodAdmissionErrorContains(t, err, pod, http.StatusNotFound, dummyError.Error())
+			assertPodAdmissionErrorContains(t, err, pod, http.StatusNotFound, "%s", dummyError.Error())
 		},
 	})
 }
