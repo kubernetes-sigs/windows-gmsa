@@ -16,7 +16,7 @@ The release process is documented [HERE](../../RELEASE.md)!
   - [ ] Publish the pre-release
 
 - [ ] Promote the `admission-webhook` image
-  - [ ] Manually tag desired container image in the [staging registry](https://console.cloud.google.com/gcr/images/k8s-staging-gmsa-webhook/GLOBAL)
+  - [ ] Manually tag desired container image in the [staging registry](https://console.cloud.google.com/artifacts/docker/k8s-staging-gmsa-webhook/us/gcr.io)
   - [ ] Use `kpromo` to open a image promo PR
 
         ```bash
