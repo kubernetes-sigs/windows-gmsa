@@ -33,8 +33,9 @@ const (
 	validate webhookOperation = "VALIDATE"
 	mutate   webhookOperation = "MUTATE"
 
-	podKind       gmsaResourceKind = "pod"
-	containerKind gmsaResourceKind = "container"
+	podKind           gmsaResourceKind = "pod"
+	containerKind     gmsaResourceKind = "container"
+	initContainerKind gmsaResourceKind = "initContainer"
 )
 
 type webhook struct {
@@ -381,8 +382,11 @@ func (webhook *webhook) mutateCreateRequest(ctx context.Context, pod *corev1.Pod
 				}
 
 				partialPath := ""
-				if resourceKind == containerKind {
+				switch resourceKind {
+				case containerKind:
 					partialPath = fmt.Sprintf("/containers/%d", containerIndex)
+				case initContainerKind:
+					partialPath = fmt.Sprintf("/initContainers/%d", containerIndex)
 				}
 
 				// worth noting that this JSON patch is guaranteed to work since we know at this point
@@ -443,12 +447,12 @@ func validateUpdateRequest(pod, oldPod *corev1.Pod) (*admissionV1.AdmissionRespo
 				oldWindowsOptions = oldPod.Spec.SecurityContext.WindowsOptions
 			}
 		} else {
-			// it's a container; look for the same container in the old pod,
+			// it's a container or an init container; look for the same container in the old pod,
 			// lazily building the map of container names to security options if needed
 			if oldPodContainerOptions == nil {
 				oldPodContainerOptions = make(map[string]*corev1.WindowsSecurityContextOptions)
 				iterateOverWindowsSecurityOptions(oldPod, func(winOpts *corev1.WindowsSecurityContextOptions, rsrcKind gmsaResourceKind, rsrcName string, _ int) *podAdmissionError {
-					if rsrcKind == containerKind {
+					if rsrcKind != podKind {
 						oldPodContainerOptions[rsrcName] = winOpts
 					}
 					return nil
@@ -494,10 +498,11 @@ func equalStringPointers(s1, s2 *string) bool {
 }
 
 // iterateOverWindowsSecurityOptions calls `f` on the pod's `.Spec.SecurityContext.WindowsOptions` field,
-// as well as over each of its container's `.SecurityContext.WindowsOptions` field.
+// as well as over each of its containers' and init containers' `.SecurityContext.WindowsOptions` field.
 // `f` can assume it only gets called with non-nil `WindowsSecurityOptions` pointers; the other
 // arguments give information on the resource owning that pointer - in particular, if that
-// resource is a container, `containerIndex` is the index of the container in the spec's list (-1 for pods).
+// resource is a container or an init container, `containerIndex` is the index of the container in the
+// spec's relevant list (`.Spec.Containers` or `.Spec.InitContainers`, respectively; -1 for pods).
 // If `f` returns an error, that breaks the loop, and the error is bubbled up.
 func iterateOverWindowsSecurityOptions(pod *corev1.Pod, f func(windowsOptions *corev1.WindowsSecurityContextOptions, resourceKind gmsaResourceKind, resourceName string, containerIndex int) *podAdmissionError) *podAdmissionError {
 	if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.WindowsOptions != nil {
@@ -509,6 +514,14 @@ func iterateOverWindowsSecurityOptions(pod *corev1.Pod, f func(windowsOptions *c
 	for i, container := range pod.Spec.Containers {
 		if container.SecurityContext != nil && container.SecurityContext.WindowsOptions != nil {
 			if err := f(container.SecurityContext.WindowsOptions, containerKind, container.Name, i); err != nil {
+				return err
+			}
+		}
+	}
+
+	for i, container := range pod.Spec.InitContainers {
+		if container.SecurityContext != nil && container.SecurityContext.WindowsOptions != nil {
+			if err := f(container.SecurityContext.WindowsOptions, initContainerKind, container.Name, i); err != nil {
 				return err
 			}
 		}

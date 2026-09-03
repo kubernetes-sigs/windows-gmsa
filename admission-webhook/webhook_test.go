@@ -310,7 +310,8 @@ func TestMutateCreateRequest(t *testing.T) {
 			patchPath := func(kind gmsaResourceKind, name string) string {
 				partialPath := ""
 
-				if kind == containerKind {
+				switch kind {
+				case containerKind:
 					containerIndex := -1
 					for i, container := range pod.Spec.Containers {
 						if container.Name == name {
@@ -323,6 +324,19 @@ func TestMutateCreateRequest(t *testing.T) {
 					}
 
 					partialPath = fmt.Sprintf("/containers/%d", containerIndex)
+				case initContainerKind:
+					containerIndex := -1
+					for i, container := range pod.Spec.InitContainers {
+						if container.Name == name {
+							containerIndex = i
+							break
+						}
+					}
+					if containerIndex == -1 {
+						t.Fatalf("Did not find any init container named %q", name)
+					}
+
+					partialPath = fmt.Sprintf("/initContainers/%d", containerIndex)
 				}
 
 				return fmt.Sprintf("/spec%s/securityContext/windowsOptions/gmsaCredentialSpec", partialPath)
@@ -330,7 +344,7 @@ func TestMutateCreateRequest(t *testing.T) {
 
 			// maps the contents to the expected patch for that container
 			expectedPatches := make(map[string]map[string]string)
-			for i := 0; i < len(pod.Spec.Containers)-1; i++ {
+			for i := 0; i < numExtraRegularContainers(pod, resourceKind); i++ {
 				credSpecContents := extraContainerName(i) + "-cred-spec-contents"
 				expectedPatches[credSpecContents] = map[string]string{
 					"op":    "add",
@@ -346,8 +360,9 @@ func TestMutateCreateRequest(t *testing.T) {
 			}
 
 			var patches []map[string]string
-			// len(pod.Spec.Containers)+1 because we're adding the hostname
-			if err := json.Unmarshal(response.Patch, &patches); assert.Nil(t, err) && assert.Equal(t, len(pod.Spec.Containers)+1, len(patches)) {
+			// numExtraRegularContainers(pod, resourceKind)+2 because the resource under test also gets a
+			// patch, and we're adding the hostname
+			if err := json.Unmarshal(response.Patch, &patches); assert.Nil(t, err) && assert.Equal(t, numExtraRegularContainers(pod, resourceKind)+2, len(patches)) {
 				foundHostname := false
 				for _, patch := range patches {
 					if value, hasValue := patch["value"]; assert.True(t, hasValue) {
@@ -365,7 +380,7 @@ func TestMutateCreateRequest(t *testing.T) {
 		},
 
 		// random hostname env not set in the following cases, and validated no hostname is set (implicitly)
-		"it the cred spec's contents are already set, along with its name, it passes and doesn't overwrite the provided contents": func(t *testing.T, pod *corev1.Pod, optionsSelector winOptionsSelector, _ gmsaResourceKind, _ string) {
+		"it the cred spec's contents are already set, along with its name, it passes and doesn't overwrite the provided contents": func(t *testing.T, pod *corev1.Pod, optionsSelector winOptionsSelector, resourceKind gmsaResourceKind, _ string) {
 			webhook := newWebhook(kubeClientFactory())
 
 			setWindowsOptions(optionsSelector(pod), dummyCredSpecName, `{"pre-set GMSA": "cred contents"}`)
@@ -374,7 +389,7 @@ func TestMutateCreateRequest(t *testing.T) {
 			assert.Nil(t, err)
 
 			// all the patches we receive should be for the extra containers
-			expectedPatchesLen := len(pod.Spec.Containers) - 1
+			expectedPatchesLen := numExtraRegularContainers(pod, resourceKind)
 
 			if expectedPatchesLen == 0 {
 				assert.Nil(t, response.PatchType)
@@ -597,16 +612,18 @@ func runWebhookValidateOrMutateTests(t *testing.T, winOptionsFactory containerWi
 			testNameSuffix = fmt.Sprintf(" and %d extra containers", extraContainersCount)
 		}
 
-		for _, resourceKind := range []gmsaResourceKind{podKind, containerKind} {
+		for _, resourceKind := range []gmsaResourceKind{podKind, containerKind, initContainerKind} {
 			for testName, testFunc := range tests {
 				podWindowsOptions := &corev1.WindowsSecurityContextOptions{}
-				containerNamesAndWindowsOptions[dummyContainerName] = &corev1.WindowsSecurityContextOptions{}
-				pod := buildPod(dummyServiceAccoutName, podWindowsOptions, containerNamesAndWindowsOptions)
 
+				var pod *corev1.Pod
 				var optionsSelector winOptionsSelector
 				var resourceName string
 				switch resourceKind {
 				case podKind:
+					containerNamesAndWindowsOptions[dummyContainerName] = &corev1.WindowsSecurityContextOptions{}
+					pod = buildPod(dummyServiceAccoutName, podWindowsOptions, containerNamesAndWindowsOptions)
+
 					optionsSelector = func(pod *corev1.Pod) *corev1.WindowsSecurityContextOptions {
 						if pod != nil && pod.Spec.SecurityContext != nil {
 							return pod.Spec.SecurityContext.WindowsOptions
@@ -616,9 +633,34 @@ func runWebhookValidateOrMutateTests(t *testing.T, winOptionsFactory containerWi
 
 					resourceName = dummyPodName
 				case containerKind:
+					containerNamesAndWindowsOptions[dummyContainerName] = &corev1.WindowsSecurityContextOptions{}
+					pod = buildPod(dummyServiceAccoutName, podWindowsOptions, containerNamesAndWindowsOptions)
+
 					optionsSelector = func(pod *corev1.Pod) *corev1.WindowsSecurityContextOptions {
 						if pod != nil {
 							for _, container := range pod.Spec.Containers {
+								if container.Name == dummyContainerName {
+									if container.SecurityContext != nil {
+										return container.SecurityContext.WindowsOptions
+									}
+									return nil
+								}
+							}
+						}
+						return nil
+					}
+
+					resourceName = dummyContainerName
+				case initContainerKind:
+					// the dummy container under test is an init container here, so it must not also
+					// be present amongst the (regular) extra containers.
+					delete(containerNamesAndWindowsOptions, dummyContainerName)
+					initContainerNamesAndWindowsOptions := map[string]*corev1.WindowsSecurityContextOptions{dummyContainerName: {}}
+					pod = buildPodWithInitContainers(dummyServiceAccoutName, nil, podWindowsOptions, containerNamesAndWindowsOptions, initContainerNamesAndWindowsOptions)
+
+					optionsSelector = func(pod *corev1.Pod) *corev1.WindowsSecurityContextOptions {
+						if pod != nil {
+							for _, container := range pod.Spec.InitContainers {
 								if container.Name == dummyContainerName {
 									if container.SecurityContext != nil {
 										return container.SecurityContext.WindowsOptions
@@ -645,6 +687,19 @@ func runWebhookValidateOrMutateTests(t *testing.T, winOptionsFactory containerWi
 
 func extraContainerName(i int) string {
 	return fmt.Sprintf("extra-container-%d", i)
+}
+
+// numExtraRegularContainers returns the number of "extra" (i.e. not under test) regular
+// containers set on pod.Spec.Containers. runWebhookValidateOrMutateTests always mixes the
+// container under test into pod.Spec.Containers for podKind/containerKind, but keeps
+// pod.Spec.Containers to only the extra containers for initContainerKind (the container under
+// test lives in pod.Spec.InitContainers instead).
+func numExtraRegularContainers(pod *corev1.Pod, resourceKind gmsaResourceKind) int {
+	count := len(pod.Spec.Containers)
+	if resourceKind != initContainerKind {
+		count--
+	}
+	return count
 }
 
 func assertPodAdmissionErrorContains(t *testing.T, err *podAdmissionError, pod *corev1.Pod, httpCode int, msgFormat string, msgArgs ...interface{}) bool {
