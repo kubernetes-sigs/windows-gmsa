@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -312,7 +313,7 @@ func (webhook *webhook) validateCreateRequest(ctx context.Context, pod *corev1.P
 				if reason != "" {
 					msg += fmt.Sprintf(", reason: %q", reason)
 				}
-				return &podAdmissionError{error: fmt.Errorf(msg), pod: pod, code: http.StatusForbidden}
+				return &podAdmissionError{error: errors.New(msg), pod: pod, code: http.StatusForbidden}
 			}
 
 			// and the contents should match the ones contained in the GMSA resource with that name
@@ -324,13 +325,13 @@ func (webhook *webhook) validateCreateRequest(ctx context.Context, pod *corev1.P
 					if compareErr != nil {
 						msg += fmt.Sprintf(": %v", compareErr)
 					}
-					return &podAdmissionError{error: fmt.Errorf(msg), pod: pod, code: http.StatusUnprocessableEntity}
+					return &podAdmissionError{error: errors.New(msg), pod: pod, code: http.StatusUnprocessableEntity}
 				}
 			}
 		} else if windowsOptions.GMSACredentialSpec != nil {
 			// the GMSA's name is not set, but the contents are
 			msg := fmt.Sprintf("%s %q has a GMSA cred spec set, but does not define the name of the corresponding resource", resourceKind, resourceName)
-			return &podAdmissionError{error: fmt.Errorf(msg), pod: pod, code: http.StatusUnprocessableEntity}
+			return &podAdmissionError{error: errors.New(msg), pod: pod, code: http.StatusUnprocessableEntity}
 		}
 
 		return nil
