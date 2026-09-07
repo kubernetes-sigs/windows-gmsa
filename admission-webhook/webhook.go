@@ -116,16 +116,15 @@ func (webhook *webhook) start(port int, tlsConfig *tlsConfig, listeningChan chan
 	} else {
 		if webhook.config.EnableCertReload {
 			logrus.Infof("Webhook certificate reload enabled")
-			certReloader := NewCertReloader(tlsConfig.crtPath, tlsConfig.keyPath)
-			_, err = certReloader.LoadCertificate()
+			certWatcher, err := NewCertReloader(tlsConfig.crtPath, tlsConfig.keyPath)
 			if err != nil {
 				return err
 			}
-
-			go watchCertFiles(context.Background(), certReloader)
+			// Note: certWatcher.Stop() is not explicitly deferred here because ServeTLS is blocking
+			// and the process typically exits when it returns.
 
 			webhook.server.TLSConfig = &tls.Config{
-				GetCertificate: certReloader.GetCertificateFunc(),
+				GetCertificate: certWatcher.GetCertificate,
 			}
 
 			err = webhook.server.ServeTLS(keepAliveListener, "", "")
