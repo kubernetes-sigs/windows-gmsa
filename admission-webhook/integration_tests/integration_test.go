@@ -351,8 +351,8 @@ func TestPossibleToAddEphemeralContainerWithGMSA(t *testing.T) {
 
 	// now append a second ephemeral container, plus a third one with no GMSA settings at all - this
 	// is the crux of the fix: the first ephemeral container is already present (and already carries
-	// inlined GMSA contents) by the time this update happens, so this exercises both the JSON-patch
-	// index offset math (the new containers' patches must target indices 1 and 2, not 0) and the
+	// inlined GMSA contents) by the time this update happens, so this exercises both the real-index
+	// JSON-patch targeting (the new containers' patches must target indices 1 and 2, not 0) and the
 	// fact that the first container must not be re-validated/re-mutated. The plain container proves
 	// the webhook doesn't inject GMSA contents into containers that never asked for them.
 	secondEphemeralContainerName := "debugger-2"
