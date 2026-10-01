@@ -305,6 +305,90 @@ func TestPossibleToUpdatePodWithExistingGMSASettings(t *testing.T) {
 	assert.True(t, success)
 }
 
+// TestPossibleToAddEphemeralContainerWithGMSA covers the `pods/ephemeralcontainers` subresource
+// update path end to end against a real cluster: it appends ephemeral containers to an already
+// running pod one at a time (as `kubectl debug` does), and checks that only the newly appended
+// container gets its GMSA contents inlined on each update, at the right index, leaving previously
+// appended ephemeral containers (and the pod's own GMSA settings) untouched.
+func TestPossibleToAddEphemeralContainerWithGMSA(t *testing.T) {
+	testName := "possible-to-add-ephemeral-container-with-gmsa"
+	credSpecTemplates := []string{"credspec-0", "credspec-1"}
+	singlePodTemplate := "single-pod-with-gmsa"
+	templates := []string{"credspecs-users-rbac-role", "service-account", "sa-rbac-binding", singlePodTemplate}
+
+	testConfig, tearDownFunc := integrationTestSetup(t, testName, credSpecTemplates, templates)
+	defer tearDownFunc()
+
+	podsClient := kubeClient(t).CoreV1().Pods(testConfig.Namespace)
+
+	// let's check that the pod has come up correctly, and has the correct pod-level GMSA cred inlined
+	pod, err := podsClient.Get(context.Background(), testName, metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, expectedCredSpec0, extractPodCredSpecContents(t, pod))
+
+	// append a first ephemeral container, referencing a different GMSA than the pod's
+	firstEphemeralContainerName := "debugger-1"
+	pod.Spec.EphemeralContainers = append(pod.Spec.EphemeralContainers, corev1.EphemeralContainer{
+		EphemeralContainerCommon: corev1.EphemeralContainerCommon{
+			Name:  firstEphemeralContainerName,
+			Image: "registry.k8s.io/pause",
+			SecurityContext: &corev1.SecurityContext{
+				WindowsOptions: &corev1.WindowsSecurityContextOptions{GMSACredentialSpecName: &testConfig.CredSpecNames[1]},
+			},
+		},
+	})
+
+	pod, err = podsClient.UpdateEphemeralContainers(context.Background(), testName, pod, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, expectedCredSpec1, extractEphemeralContainerCredSpecContents(t, pod, firstEphemeralContainerName))
+	// the pod-level GMSA settings must not have been touched by this update
+	assert.Equal(t, expectedCredSpec0, extractPodCredSpecContents(t, pod))
+
+	// now append a second ephemeral container, plus a third one with no GMSA settings at all - this
+	// is the crux of the fix: the first ephemeral container is already present (and already carries
+	// inlined GMSA contents) by the time this update happens, so this exercises both the real-index
+	// JSON-patch targeting (the new containers' patches must target indices 1 and 2, not 0) and the
+	// fact that the first container must not be re-validated/re-mutated. The plain container proves
+	// the webhook doesn't inject GMSA contents into containers that never asked for them.
+	secondEphemeralContainerName := "debugger-2"
+	plainEphemeralContainerName := "debugger-plain"
+	pod.Spec.EphemeralContainers = append(pod.Spec.EphemeralContainers,
+		corev1.EphemeralContainer{
+			EphemeralContainerCommon: corev1.EphemeralContainerCommon{
+				Name:  secondEphemeralContainerName,
+				Image: "registry.k8s.io/pause",
+				SecurityContext: &corev1.SecurityContext{
+					WindowsOptions: &corev1.WindowsSecurityContextOptions{GMSACredentialSpecName: &testConfig.CredSpecNames[0]},
+				},
+			},
+		},
+		corev1.EphemeralContainer{
+			EphemeralContainerCommon: corev1.EphemeralContainerCommon{
+				Name:  plainEphemeralContainerName,
+				Image: "registry.k8s.io/pause",
+				// no security context at all - this container has nothing to do with GMSA
+			},
+		},
+	)
+
+	pod, err = podsClient.UpdateEphemeralContainers(context.Background(), testName, pod, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, expectedCredSpec0, extractEphemeralContainerCredSpecContents(t, pod, secondEphemeralContainerName))
+	// the first ephemeral container's already-inlined GMSA contents must remain untouched
+	assert.Equal(t, expectedCredSpec1, extractEphemeralContainerCredSpecContents(t, pod, firstEphemeralContainerName))
+	assert.Equal(t, expectedCredSpec0, extractPodCredSpecContents(t, pod))
+	// the plain container must not have had any GMSA contents injected into it
+	assertNoEphemeralContainerCredSpec(t, pod, plainEphemeralContainerName)
+}
+
 func TestDeployV1Alpha1CredSpecGetAllVersions(t *testing.T) {
 	testName := "deploy-v1alpha1-credspec-get-all-versions"
 	credSpecTemplates := []string{"credspec-0", "credspec-1"}
@@ -685,4 +769,37 @@ func extractContainerCredSpecContents(t *testing.T, pod *corev1.Pod, containerNa
 
 	t.Fatalf("Did not find any container named %q", containerName)
 	panic("won't happen, but required by the compiler")
+}
+
+func extractEphemeralContainerCredSpecContents(t *testing.T, pod *corev1.Pod, containerName string) string {
+	for _, container := range pod.Spec.EphemeralContainers {
+		if container.Name == containerName {
+			if container.SecurityContext == nil ||
+				container.SecurityContext.WindowsOptions == nil ||
+				container.SecurityContext.WindowsOptions.GMSACredentialSpec == nil {
+				t.Fatalf("No cred spec for ephemeral container %q", containerName)
+			}
+			return *container.SecurityContext.WindowsOptions.GMSACredentialSpec
+		}
+	}
+
+	t.Fatalf("Did not find any ephemeral container named %q", containerName)
+	panic("won't happen, but required by the compiler")
+}
+
+// assertNoEphemeralContainerCredSpec asserts that the ephemeral container named `containerName`
+// does not have any GMSA cred spec contents inlined into it - i.e. the webhook must not have
+// injected anything into a container that never asked for it.
+func assertNoEphemeralContainerCredSpec(t *testing.T, pod *corev1.Pod, containerName string) {
+	for _, container := range pod.Spec.EphemeralContainers {
+		if container.Name == containerName {
+			if container.SecurityContext != nil && container.SecurityContext.WindowsOptions != nil {
+				assert.Nil(t, container.SecurityContext.WindowsOptions.GMSACredentialSpec,
+					"ephemeral container %q should not have had a GMSA cred spec injected", containerName)
+			}
+			return
+		}
+	}
+
+	t.Fatalf("Did not find any ephemeral container named %q", containerName)
 }
