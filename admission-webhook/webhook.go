@@ -288,7 +288,7 @@ func (webhook *webhook) validateOrMutate(ctx context.Context, request *admission
 				return nil, err
 			}
 
-			newEphemeralContainers, oldCount, err := newlyAppendedEphemeralContainers(pod, oldPod)
+			newEphemeralContainers, err := newlyAppendedEphemeralContainers(pod, oldPod)
 			if err != nil {
 				return nil, err
 			}
@@ -297,7 +297,7 @@ func (webhook *webhook) validateOrMutate(ctx context.Context, request *admission
 			case validate:
 				return webhook.validateEphemeralContainersUpdateRequest(ctx, pod, newEphemeralContainers, request.Namespace)
 			case mutate:
-				return webhook.mutateEphemeralContainersUpdateRequest(ctx, pod, newEphemeralContainers, oldCount)
+				return webhook.mutateEphemeralContainersUpdateRequest(ctx, pod, newEphemeralContainers)
 			default:
 				// shouldn't happen, but needed so that all paths in the function have a return value
 				panic(fmt.Errorf("unexpected webhook operation: %v", operation))
@@ -336,24 +336,55 @@ func (webhook *webhook) validateCreateRequest(ctx context.Context, pod *corev1.P
 	return webhook.validateWindowsSecurityOptions(ctx, pod, namespace, iterateOverWindowsSecurityOptions)
 }
 
+// newEphemeralContainer pairs a newly appended ephemeral container with its actual index in
+// `pod.Spec.EphemeralContainers`. Since `newlyAppendedEphemeralContainers` no longer assumes new
+// containers form a contiguous tail, callers need the real index of each one to build correct
+// JSON-patch paths - a single offset wouldn't do.
+type newEphemeralContainer struct {
+	container corev1.EphemeralContainer
+	index     int
+}
+
 // newlyAppendedEphemeralContainers checks that `pod.Spec.EphemeralContainers` is `oldPod`'s
 // `.Spec.EphemeralContainers` with zero or more new entries appended to it - the only way ephemeral
 // containers can legally change on a `pods/ephemeralcontainers` update request - and returns those
-// newly appended containers, along with the number of containers that were already present in
-// `oldPod` (used as the JSON-patch index offset by callers that need to patch the new containers).
-func newlyAppendedEphemeralContainers(pod, oldPod *corev1.Pod) ([]corev1.EphemeralContainer, int, *podAdmissionError) {
+// newly appended containers, each paired with its actual index in `pod.Spec.EphemeralContainers`.
+func newlyAppendedEphemeralContainers(pod, oldPod *corev1.Pod) ([]newEphemeralContainer, *podAdmissionError) {
 	oldContainers := oldPod.Spec.EphemeralContainers
 	newContainers := pod.Spec.EphemeralContainers
 
-	if len(newContainers) < len(oldContainers) || !reflect.DeepEqual(newContainers[:len(oldContainers)], oldContainers) {
-		return nil, 0, &podAdmissionError{
-			error: errors.New("ephemeral containers can only be appended to a pod, existing ones cannot be modified or removed"),
-			pod:   pod,
-			code:  http.StatusBadRequest,
+	// for each new container, look for a matching old container that hasn't already been
+	// claimed by an earlier new container; anything left unclaimed is a newly appended
+	// container. `claimed` guards against a new container being matched against the same old
+	// container twice when there are duplicate entries.
+	claimed := make([]bool, len(oldContainers))
+	var appended []newEphemeralContainer
+
+	for i, container := range newContainers {
+		found := false
+		for j, oldContainer := range oldContainers {
+			if !claimed[j] && reflect.DeepEqual(container, oldContainer) {
+				claimed[j] = true
+				found = true
+				break
+			}
+		}
+		if !found {
+			appended = append(appended, newEphemeralContainer{container: container, index: i})
 		}
 	}
 
-	return newContainers[len(oldContainers):], len(oldContainers), nil
+	for _, wasClaimed := range claimed {
+		if !wasClaimed {
+			return nil, &podAdmissionError{
+				error: errors.New("ephemeral containers can only be appended to a pod, existing ones cannot be modified or removed"),
+				pod:   pod,
+				code:  http.StatusBadRequest,
+			}
+		}
+	}
+
+	return appended, nil
 }
 
 // validateEphemeralContainersUpdateRequest ensures that the GMSA contents set on `newContainers` -
@@ -363,9 +394,9 @@ func newlyAppendedEphemeralContainers(pod, oldPod *corev1.Pod) ([]corev1.Ephemer
 // are inspected: previously admitted ephemeral containers must not be re-validated, since their
 // backing GMSA resource or the service account's authorization to use it may have changed since
 // they were admitted, which must not cause this, unrelated, request to be rejected.
-func (webhook *webhook) validateEphemeralContainersUpdateRequest(ctx context.Context, pod *corev1.Pod, newContainers []corev1.EphemeralContainer, namespace string) (*admissionV1.AdmissionResponse, *podAdmissionError) {
+func (webhook *webhook) validateEphemeralContainersUpdateRequest(ctx context.Context, pod *corev1.Pod, newContainers []newEphemeralContainer, namespace string) (*admissionV1.AdmissionResponse, *podAdmissionError) {
 	iterate := func(_ *corev1.Pod, f func(windowsOptions *corev1.WindowsSecurityContextOptions, resourceKind gmsaResourceKind, resourceName string, containerIndex int) *podAdmissionError) *podAdmissionError {
-		return iterateOverGivenEphemeralContainersWindowsSecurityOptions(newContainers, 0, f)
+		return iterateOverGivenEphemeralContainersWindowsSecurityOptions(newContainers, f)
 	}
 	return webhook.validateWindowsSecurityOptions(ctx, pod, namespace, iterate)
 }
@@ -464,12 +495,11 @@ func (webhook *webhook) mutateCreateRequest(ctx context.Context, pod *corev1.Pod
 // mutateEphemeralContainersUpdateRequest inlines the requested GMSA's into `newContainers` - the
 // ephemeral containers newly appended by this request, as computed by
 // `newlyAppendedEphemeralContainers` - `WindowsSecurityOptions` structs. Only the newly appended
-// containers are inspected, since previously admitted ones are immutable; `indexOffset` (the number
-// of ephemeral containers that already existed before this request) is added to the JSON-patch
-// index so patches land on the right entries of `.Spec.EphemeralContainers`.
-func (webhook *webhook) mutateEphemeralContainersUpdateRequest(ctx context.Context, pod *corev1.Pod, newContainers []corev1.EphemeralContainer, indexOffset int) (*admissionV1.AdmissionResponse, *podAdmissionError) {
+// containers are inspected, since previously admitted ones are immutable; each patch targets the
+// container's actual index in `.Spec.EphemeralContainers`, as carried by `newContainers`.
+func (webhook *webhook) mutateEphemeralContainersUpdateRequest(ctx context.Context, pod *corev1.Pod, newContainers []newEphemeralContainer) (*admissionV1.AdmissionResponse, *podAdmissionError) {
 	iterate := func(_ *corev1.Pod, f func(windowsOptions *corev1.WindowsSecurityContextOptions, resourceKind gmsaResourceKind, resourceName string, containerIndex int) *podAdmissionError) *podAdmissionError {
-		return iterateOverGivenEphemeralContainersWindowsSecurityOptions(newContainers, indexOffset, f)
+		return iterateOverGivenEphemeralContainersWindowsSecurityOptions(newContainers, f)
 	}
 
 	patches, _, err := webhook.computeGMSAPatches(ctx, pod, iterate)
@@ -644,21 +674,25 @@ func iterateOverWindowsSecurityOptions(pod *corev1.Pod, f func(windowsOptions *c
 // containers' `.SecurityContext.WindowsOptions` field (see `iterateOverWindowsSecurityOptions` for
 // details on `f`'s contract).
 func iterateOverEphemeralContainerWindowsSecurityOptions(pod *corev1.Pod, f func(windowsOptions *corev1.WindowsSecurityContextOptions, resourceKind gmsaResourceKind, resourceName string, containerIndex int) *podAdmissionError) *podAdmissionError {
-	return iterateOverGivenEphemeralContainersWindowsSecurityOptions(pod.Spec.EphemeralContainers, 0, f)
+	containers := make([]newEphemeralContainer, len(pod.Spec.EphemeralContainers))
+	for i, container := range pod.Spec.EphemeralContainers {
+		containers[i] = newEphemeralContainer{container: container, index: i}
+	}
+	return iterateOverGivenEphemeralContainersWindowsSecurityOptions(containers, f)
 }
 
 // iterateOverGivenEphemeralContainersWindowsSecurityOptions calls `f` on each of `containers`'
 // `.SecurityContext.WindowsOptions` field (see `iterateOverWindowsSecurityOptions` for details on
-// `f`'s contract), offsetting the `containerIndex` passed to `f` by `indexOffset`. This is used
-// standalone (rather than through `iterateOverEphemeralContainerWindowsSecurityOptions`) to
-// validate/mutate `ephemeralcontainers` subresource update requests, so that only the newly
-// appended ephemeral containers are inspected, with `indexOffset` set to the number of ephemeral
-// containers that already existed on the pod, so that resulting JSON patches target the right
-// indices in `.Spec.EphemeralContainers`.
-func iterateOverGivenEphemeralContainersWindowsSecurityOptions(containers []corev1.EphemeralContainer, indexOffset int, f func(windowsOptions *corev1.WindowsSecurityContextOptions, resourceKind gmsaResourceKind, resourceName string, containerIndex int) *podAdmissionError) *podAdmissionError {
-	for i, container := range containers {
-		if container.SecurityContext != nil && container.SecurityContext.WindowsOptions != nil {
-			if err := f(container.SecurityContext.WindowsOptions, ephemeralContainerKind, container.Name, indexOffset+i); err != nil {
+// `f`'s contract), passing each container's own `index` (its actual position in
+// `.Spec.EphemeralContainers`) as `containerIndex`. This is used standalone (rather than through
+// `iterateOverEphemeralContainerWindowsSecurityOptions`) to validate/mutate `ephemeralcontainers`
+// subresource update requests, so that only the newly appended ephemeral containers are inspected,
+// with each one's real index carried along so resulting JSON patches target the right indices in
+// `.Spec.EphemeralContainers`.
+func iterateOverGivenEphemeralContainersWindowsSecurityOptions(containers []newEphemeralContainer, f func(windowsOptions *corev1.WindowsSecurityContextOptions, resourceKind gmsaResourceKind, resourceName string, containerIndex int) *podAdmissionError) *podAdmissionError {
+	for _, c := range containers {
+		if c.container.SecurityContext != nil && c.container.SecurityContext.WindowsOptions != nil {
+			if err := f(c.container.SecurityContext.WindowsOptions, ephemeralContainerKind, c.container.Name, c.index); err != nil {
 				return err
 			}
 		}

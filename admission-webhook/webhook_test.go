@@ -528,6 +528,17 @@ func TestValidateUpdateRequest(t *testing.T) {
 	})
 }
 
+// allAsNewEphemeralContainers treats every container in `containers` as newly appended, at its own
+// index - a convenience for tests exercising `validateEphemeralContainersUpdateRequest` /
+// `mutateEphemeralContainersUpdateRequest` directly on a full ephemeral containers list.
+func allAsNewEphemeralContainers(containers []corev1.EphemeralContainer) []newEphemeralContainer {
+	result := make([]newEphemeralContainer, len(containers))
+	for i, container := range containers {
+		result[i] = newEphemeralContainer{container: container, index: i}
+	}
+	return result
+}
+
 // TestValidateEphemeralContainersUpdateRequest checks that `validateEphemeralContainersUpdateRequest`
 // only inspects the pod's ephemeral containers (as opposed to `validateCreateRequest`, which looks at
 // the whole pod), since that's the only thing that can change on an `ephemeralcontainers` subresource
@@ -563,7 +574,7 @@ func TestValidateEphemeralContainersUpdateRequest(t *testing.T) {
 			map[string]*corev1.WindowsSecurityContextOptions{dummyContainerName: matchingOptions},
 		)
 
-		response, err := webhook.validateEphemeralContainersUpdateRequest(context.Background(), pod, pod.Spec.EphemeralContainers, dummyNamespace)
+		response, err := webhook.validateEphemeralContainersUpdateRequest(context.Background(), pod, allAsNewEphemeralContainers(pod.Spec.EphemeralContainers), dummyNamespace)
 		assert.Nil(t, err)
 
 		require.NotNil(t, response)
@@ -580,7 +591,7 @@ func TestValidateEphemeralContainersUpdateRequest(t *testing.T) {
 			map[string]*corev1.WindowsSecurityContextOptions{dummyContainerName: ephemeralOptions},
 		)
 
-		response, err := webhook.validateEphemeralContainersUpdateRequest(context.Background(), pod, pod.Spec.EphemeralContainers, dummyNamespace)
+		response, err := webhook.validateEphemeralContainersUpdateRequest(context.Background(), pod, allAsNewEphemeralContainers(pod.Spec.EphemeralContainers), dummyNamespace)
 		assert.Nil(t, response)
 
 		assertPodAdmissionErrorContains(t, err, pod, http.StatusUnprocessableEntity,
@@ -604,7 +615,7 @@ func TestValidateEphemeralContainersUpdateRequest(t *testing.T) {
 			map[string]*corev1.WindowsSecurityContextOptions{dummyContainerName: ephemeralOptions},
 		)
 
-		response, err := webhook.validateEphemeralContainersUpdateRequest(context.Background(), pod, pod.Spec.EphemeralContainers, dummyNamespace)
+		response, err := webhook.validateEphemeralContainersUpdateRequest(context.Background(), pod, allAsNewEphemeralContainers(pod.Spec.EphemeralContainers), dummyNamespace)
 		assert.Nil(t, response)
 
 		assertPodAdmissionErrorContains(t, err, pod, http.StatusForbidden,
@@ -632,7 +643,7 @@ func TestValidateEphemeralContainersUpdateRequest(t *testing.T) {
 			map[string]*corev1.WindowsSecurityContextOptions{dummyContainerName: ephemeralOptions},
 		)
 
-		response, err := webhook.validateEphemeralContainersUpdateRequest(context.Background(), pod, pod.Spec.EphemeralContainers, dummyNamespace)
+		response, err := webhook.validateEphemeralContainersUpdateRequest(context.Background(), pod, allAsNewEphemeralContainers(pod.Spec.EphemeralContainers), dummyNamespace)
 		assert.Nil(t, err)
 
 		require.NotNil(t, response)
@@ -668,7 +679,7 @@ func TestMutateEphemeralContainersUpdateRequest(t *testing.T) {
 			map[string]*corev1.WindowsSecurityContextOptions{dummyContainerName: ephemeralOptions},
 		)
 
-		response, err := webhook.mutateEphemeralContainersUpdateRequest(context.Background(), pod, pod.Spec.EphemeralContainers, 0)
+		response, err := webhook.mutateEphemeralContainersUpdateRequest(context.Background(), pod, allAsNewEphemeralContainers(pod.Spec.EphemeralContainers))
 		assert.Nil(t, err)
 
 		require.NotNil(t, response)
@@ -686,7 +697,7 @@ func TestMutateEphemeralContainersUpdateRequest(t *testing.T) {
 
 		pod := buildPodWithEphemeralContainers(dummyServiceAccoutName, nil, nil, nil, nil, nil)
 
-		response, err := webhook.mutateEphemeralContainersUpdateRequest(context.Background(), pod, pod.Spec.EphemeralContainers, 0)
+		response, err := webhook.mutateEphemeralContainersUpdateRequest(context.Background(), pod, allAsNewEphemeralContainers(pod.Spec.EphemeralContainers))
 		assert.Nil(t, err)
 
 		require.NotNil(t, response)
@@ -705,7 +716,7 @@ func TestMutateEphemeralContainersUpdateRequest(t *testing.T) {
 			map[string]*corev1.WindowsSecurityContextOptions{dummyContainerName: ephemeralOptions},
 		)
 
-		response, err := webhook.mutateEphemeralContainersUpdateRequest(context.Background(), pod, pod.Spec.EphemeralContainers, 0)
+		response, err := webhook.mutateEphemeralContainersUpdateRequest(context.Background(), pod, allAsNewEphemeralContainers(pod.Spec.EphemeralContainers))
 		assert.Nil(t, err)
 
 		require.NotNil(t, response)
@@ -741,7 +752,7 @@ func TestMutateEphemeralContainersUpdateRequest(t *testing.T) {
 		pod := buildPod(dummyServiceAccoutName, nil, nil)
 		pod.Spec.EphemeralContainers = newContainers
 
-		response, err := webhook.mutateEphemeralContainersUpdateRequest(context.Background(), pod, newContainers, 0)
+		response, err := webhook.mutateEphemeralContainersUpdateRequest(context.Background(), pod, allAsNewEphemeralContainers(newContainers))
 		assert.Nil(t, err)
 
 		require.NotNil(t, response)
@@ -756,8 +767,9 @@ func TestMutateEphemeralContainersUpdateRequest(t *testing.T) {
 }
 
 // TestNewlyAppendedEphemeralContainers checks that `newlyAppendedEphemeralContainers` correctly
-// identifies the containers newly appended by a `pods/ephemeralcontainers` update request, and
-// rejects requests where the old containers were not left as an unchanged prefix of the new list.
+// identifies the containers newly appended by a `pods/ephemeralcontainers` update request, pairing
+// each with its actual index in the new list, and rejects requests where an old container is
+// missing from the new list (having been removed or modified).
 func TestNewlyAppendedEphemeralContainers(t *testing.T) {
 	existingContainer := corev1.EphemeralContainer{
 		EphemeralContainerCommon: corev1.EphemeralContainerCommon{Name: "existing-container"},
@@ -776,29 +788,26 @@ func TestNewlyAppendedEphemeralContainers(t *testing.T) {
 		oldPod := buildPodWithContainers(existingContainer)
 		pod := buildPodWithContainers(existingContainer)
 
-		newContainers, oldCount, err := newlyAppendedEphemeralContainers(pod, oldPod)
+		newContainers, err := newlyAppendedEphemeralContainers(pod, oldPod)
 		assert.Nil(t, err)
-		assert.Equal(t, 1, oldCount)
 		assert.Empty(t, newContainers)
 	})
 
-	t.Run("with a newly appended container, it returns just that container", func(t *testing.T) {
+	t.Run("with a newly appended container, it returns just that container, at its own index", func(t *testing.T) {
 		oldPod := buildPodWithContainers(existingContainer)
 		pod := buildPodWithContainers(existingContainer, newContainer)
 
-		newContainers, oldCount, err := newlyAppendedEphemeralContainers(pod, oldPod)
+		newContainers, err := newlyAppendedEphemeralContainers(pod, oldPod)
 		assert.Nil(t, err)
-		assert.Equal(t, 1, oldCount)
-		assert.Equal(t, []corev1.EphemeralContainer{newContainer}, newContainers)
+		assert.Equal(t, []newEphemeralContainer{{container: newContainer, index: 1}}, newContainers)
 	})
 
 	t.Run("if the new list is shorter than the old one, it fails", func(t *testing.T) {
 		oldPod := buildPodWithContainers(existingContainer, newContainer)
 		pod := buildPodWithContainers(existingContainer)
 
-		newContainers, oldCount, err := newlyAppendedEphemeralContainers(pod, oldPod)
+		newContainers, err := newlyAppendedEphemeralContainers(pod, oldPod)
 		assert.Nil(t, newContainers)
-		assert.Equal(t, 0, oldCount)
 		assertPodAdmissionErrorContains(t, err, pod, http.StatusBadRequest,
 			"ephemeral containers can only be appended to a pod, existing ones cannot be modified or removed")
 	})
@@ -809,9 +818,8 @@ func TestNewlyAppendedEphemeralContainers(t *testing.T) {
 		modifiedContainer.Image = "some-other-image"
 		pod := buildPodWithContainers(modifiedContainer, newContainer)
 
-		newContainers, oldCount, err := newlyAppendedEphemeralContainers(pod, oldPod)
+		newContainers, err := newlyAppendedEphemeralContainers(pod, oldPod)
 		assert.Nil(t, newContainers)
-		assert.Equal(t, 0, oldCount)
 		assertPodAdmissionErrorContains(t, err, pod, http.StatusBadRequest,
 			"ephemeral containers can only be appended to a pod, existing ones cannot be modified or removed")
 	})
@@ -823,13 +831,12 @@ func TestNewlyAppendedEphemeralContainers(t *testing.T) {
 
 		// oldPod has two existing containers; the request removes anotherExistingContainer and
 		// appends newContainer, keeping the same total count - this must still be rejected, since
-		// the old containers are no longer an unchanged prefix of the new list.
+		// anotherExistingContainer is no longer present anywhere in the new list.
 		oldPod := buildPodWithContainers(existingContainer, anotherExistingContainer)
 		pod := buildPodWithContainers(existingContainer, newContainer)
 
-		newContainers, oldCount, err := newlyAppendedEphemeralContainers(pod, oldPod)
+		newContainers, err := newlyAppendedEphemeralContainers(pod, oldPod)
 		assert.Nil(t, newContainers)
-		assert.Equal(t, 0, oldCount)
 		assertPodAdmissionErrorContains(t, err, pod, http.StatusBadRequest,
 			"ephemeral containers can only be appended to a pod, existing ones cannot be modified or removed")
 	})
@@ -842,14 +849,13 @@ func TestNewlyAppendedEphemeralContainers(t *testing.T) {
 			EphemeralContainerCommon: corev1.EphemeralContainerCommon{Name: "another-new-container"},
 		}
 
-		// the new list is longer than the old one, so the cheap length check alone wouldn't catch
-		// this - it must be caught by the prefix-equality check instead.
+		// the new list is longer than the old one, so a cheap length check alone wouldn't catch
+		// this - it must be caught by the missing-old-container check instead.
 		oldPod := buildPodWithContainers(existingContainer, anotherExistingContainer)
 		pod := buildPodWithContainers(existingContainer, newContainer, anotherNewContainer)
 
-		newContainers, oldCount, err := newlyAppendedEphemeralContainers(pod, oldPod)
+		newContainers, err := newlyAppendedEphemeralContainers(pod, oldPod)
 		assert.Nil(t, newContainers)
-		assert.Equal(t, 0, oldCount)
 		assertPodAdmissionErrorContains(t, err, pod, http.StatusBadRequest,
 			"ephemeral containers can only be appended to a pod, existing ones cannot be modified or removed")
 	})
