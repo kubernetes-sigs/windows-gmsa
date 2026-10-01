@@ -859,6 +859,23 @@ func TestNewlyAppendedEphemeralContainers(t *testing.T) {
 		assertPodAdmissionErrorContains(t, err, pod, http.StatusBadRequest,
 			"ephemeral containers can only be appended to a pod, existing ones cannot be modified or removed")
 	})
+
+	t.Run("if an existing container is modified but an unmodified duplicate of it also appears in the new list, it still fails", func(t *testing.T) {
+		modifiedContainer := existingContainer
+		modifiedContainer.Image = "some-other-image"
+
+		// an attacker could try to disguise a modification as an append by pairing a modified
+		// copy of existingContainer with a byte-for-byte duplicate elsewhere in the new list:
+		// content-only matching would let the duplicate "absorb" the old container, leaving the
+		// modified copy to be waved through as newly appended. Matching by name must catch this.
+		oldPod := buildPodWithContainers(existingContainer)
+		pod := buildPodWithContainers(modifiedContainer, existingContainer)
+
+		newContainers, err := newlyAppendedEphemeralContainers(pod, oldPod)
+		assert.Nil(t, newContainers)
+		assertPodAdmissionErrorContains(t, err, pod, http.StatusBadRequest,
+			"ephemeral containers can only be appended to a pod, existing ones cannot be modified or removed")
+	})
 }
 
 // TestValidateOrMutateEphemeralContainersSubresourceRequest is an AdmissionRequest-level test (as
@@ -1022,6 +1039,59 @@ func TestValidateOrMutateEphemeralContainersSubresourceRequest(t *testing.T) {
 
 			assertPodAdmissionErrorContains(t, err, expectedPod, http.StatusBadRequest,
 				"ephemeral containers can only be appended to a pod, existing ones cannot be modified or removed")
+		}
+	})
+
+	t.Run("mutate patches a newly appended container inserted in the middle of the list, at its own real index", func(t *testing.T) {
+		// give oldPod a second existing container, so a new container inserted between the two
+		// existing ones lands at an index that an offset-based scheme (old-length as offset)
+		// would get wrong.
+		anotherExistingContainer := corev1.EphemeralContainer{
+			EphemeralContainerCommon: corev1.EphemeralContainerCommon{Name: "another-existing-container"},
+		}
+		oldPodWithTwoExisting := oldPod.DeepCopy()
+		oldPodWithTwoExisting.Spec.EphemeralContainers = append(oldPodWithTwoExisting.Spec.EphemeralContainers, anotherExistingContainer)
+
+		newContainer := corev1.EphemeralContainer{
+			EphemeralContainerCommon: corev1.EphemeralContainerCommon{
+				Name:            newContainerName,
+				SecurityContext: &corev1.SecurityContext{WindowsOptions: buildWindowsOptions(dummyCredSpecName, "")},
+			},
+		}
+
+		pod := oldPodWithTwoExisting.DeepCopy()
+		pod.Spec.EphemeralContainers = []corev1.EphemeralContainer{
+			oldPodWithTwoExisting.Spec.EphemeralContainers[0],
+			newContainer,
+			oldPodWithTwoExisting.Spec.EphemeralContainers[1],
+		}
+
+		oldPodRaw, err := json.Marshal(oldPodWithTwoExisting)
+		require.NoError(t, err)
+		podRaw, err := json.Marshal(pod)
+		require.NoError(t, err)
+
+		request := &admissionV1.AdmissionRequest{
+			Kind:        metav1.GroupVersionKind{Kind: "Pod"},
+			Namespace:   dummyNamespace,
+			Operation:   admissionV1.Update,
+			SubResource: "ephemeralcontainers",
+			Object:      runtime.RawExtension{Raw: podRaw},
+			OldObject:   runtime.RawExtension{Raw: oldPodRaw},
+		}
+
+		webhook := newWebhook(kubeClientFactory())
+
+		response, err := webhook.validateOrMutate(context.Background(), request, mutate)
+		assert.Nil(t, err)
+
+		require.NotNil(t, response)
+		assert.True(t, response.Allowed)
+
+		var patches []map[string]string
+		if err := json.Unmarshal(response.Patch, &patches); assert.Nil(t, err) && assert.Equal(t, 1, len(patches)) {
+			assert.Equal(t, "/spec/ephemeralContainers/1/securityContext/windowsOptions/gmsaCredentialSpec", patches[0]["path"])
+			assert.Equal(t, currentCredSpecContents, patches[0]["value"])
 		}
 	})
 }

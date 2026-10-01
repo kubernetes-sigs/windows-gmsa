@@ -353,34 +353,40 @@ func newlyAppendedEphemeralContainers(pod, oldPod *corev1.Pod) ([]newEphemeralCo
 	oldContainers := oldPod.Spec.EphemeralContainers
 	newContainers := pod.Spec.EphemeralContainers
 
-	// for each new container, look for a matching old container that hasn't already been
-	// claimed by an earlier new container; anything left unclaimed is a newly appended
-	// container. `claimed` guards against a new container being matched against the same old
-	// container twice when there are duplicate entries.
-	claimed := make([]bool, len(oldContainers))
+	rejected := &podAdmissionError{
+		error: errors.New("ephemeral containers can only be appended to a pod, existing ones cannot be modified or removed"),
+		pod:   pod,
+		code:  http.StatusBadRequest,
+	}
+
+	// container names are unique within a pod, so they're what identifies "the same" container
+	// across the old and new lists - matching on content alone would let a container whose name
+	// already existed sneak through as "new" (unchanged) by content if a copy of its original
+	// content happens to appear elsewhere in the new list. For each new container, look up any
+	// old container with the same name: if there is one, it must be byte-for-byte identical
+	// (otherwise it was illegally modified); if there isn't one, the container is newly appended.
+	oldByName := make(map[string]corev1.EphemeralContainer, len(oldContainers))
+	for _, oldContainer := range oldContainers {
+		oldByName[oldContainer.Name] = oldContainer
+	}
+
+	seen := make(map[string]bool, len(oldContainers))
 	var appended []newEphemeralContainer
 
 	for i, container := range newContainers {
-		found := false
-		for j, oldContainer := range oldContainers {
-			if !claimed[j] && reflect.DeepEqual(container, oldContainer) {
-				claimed[j] = true
-				found = true
-				break
+		if oldContainer, existed := oldByName[container.Name]; existed {
+			if !reflect.DeepEqual(container, oldContainer) {
+				return nil, rejected
 			}
+			seen[container.Name] = true
+			continue
 		}
-		if !found {
-			appended = append(appended, newEphemeralContainer{container: container, index: i})
-		}
+		appended = append(appended, newEphemeralContainer{container: container, index: i})
 	}
 
-	for _, wasClaimed := range claimed {
-		if !wasClaimed {
-			return nil, &podAdmissionError{
-				error: errors.New("ephemeral containers can only be appended to a pod, existing ones cannot be modified or removed"),
-				pod:   pod,
-				code:  http.StatusBadRequest,
-			}
+	for name := range oldByName {
+		if !seen[name] {
+			return nil, rejected
 		}
 	}
 
