@@ -18,6 +18,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/util/retry"
 )
 
 const (
@@ -330,17 +331,23 @@ func TestPossibleToAddEphemeralContainerWithGMSA(t *testing.T) {
 
 	// append a first ephemeral container, referencing a different GMSA than the pod's
 	firstEphemeralContainerName := "debugger-1"
-	pod.Spec.EphemeralContainers = append(pod.Spec.EphemeralContainers, corev1.EphemeralContainer{
-		EphemeralContainerCommon: corev1.EphemeralContainerCommon{
-			Name:  firstEphemeralContainerName,
-			Image: "registry.k8s.io/pause",
-			SecurityContext: &corev1.SecurityContext{
-				WindowsOptions: &corev1.WindowsSecurityContextOptions{GMSACredentialSpecName: &testConfig.CredSpecNames[1]},
+	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		pod, err = podsClient.Get(context.Background(), testName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		pod.Spec.EphemeralContainers = append(pod.Spec.EphemeralContainers, corev1.EphemeralContainer{
+			EphemeralContainerCommon: corev1.EphemeralContainerCommon{
+				Name:  firstEphemeralContainerName,
+				Image: "registry.k8s.io/pause",
+				SecurityContext: &corev1.SecurityContext{
+					WindowsOptions: &corev1.WindowsSecurityContextOptions{GMSACredentialSpecName: &testConfig.CredSpecNames[1]},
+				},
 			},
-		},
+		})
+		pod, err = podsClient.UpdateEphemeralContainers(context.Background(), testName, pod, metav1.UpdateOptions{})
+		return err
 	})
-
-	pod, err = podsClient.UpdateEphemeralContainers(context.Background(), testName, pod, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -357,26 +364,32 @@ func TestPossibleToAddEphemeralContainerWithGMSA(t *testing.T) {
 	// the webhook doesn't inject GMSA contents into containers that never asked for them.
 	secondEphemeralContainerName := "debugger-2"
 	plainEphemeralContainerName := "debugger-plain"
-	pod.Spec.EphemeralContainers = append(pod.Spec.EphemeralContainers,
-		corev1.EphemeralContainer{
-			EphemeralContainerCommon: corev1.EphemeralContainerCommon{
-				Name:  secondEphemeralContainerName,
-				Image: "registry.k8s.io/pause",
-				SecurityContext: &corev1.SecurityContext{
-					WindowsOptions: &corev1.WindowsSecurityContextOptions{GMSACredentialSpecName: &testConfig.CredSpecNames[0]},
+	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		pod, err = podsClient.Get(context.Background(), testName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		pod.Spec.EphemeralContainers = append(pod.Spec.EphemeralContainers,
+			corev1.EphemeralContainer{
+				EphemeralContainerCommon: corev1.EphemeralContainerCommon{
+					Name:  secondEphemeralContainerName,
+					Image: "registry.k8s.io/pause",
+					SecurityContext: &corev1.SecurityContext{
+						WindowsOptions: &corev1.WindowsSecurityContextOptions{GMSACredentialSpecName: &testConfig.CredSpecNames[0]},
+					},
 				},
 			},
-		},
-		corev1.EphemeralContainer{
-			EphemeralContainerCommon: corev1.EphemeralContainerCommon{
-				Name:  plainEphemeralContainerName,
-				Image: "registry.k8s.io/pause",
-				// no security context at all - this container has nothing to do with GMSA
+			corev1.EphemeralContainer{
+				EphemeralContainerCommon: corev1.EphemeralContainerCommon{
+					Name:  plainEphemeralContainerName,
+					Image: "registry.k8s.io/pause",
+					// no security context at all - this container has nothing to do with GMSA
+				},
 			},
-		},
-	)
-
-	pod, err = podsClient.UpdateEphemeralContainers(context.Background(), testName, pod, metav1.UpdateOptions{})
+		)
+		pod, err = podsClient.UpdateEphemeralContainers(context.Background(), testName, pod, metav1.UpdateOptions{})
+		return err
+	})
 	if err != nil {
 		t.Fatal(err)
 	}

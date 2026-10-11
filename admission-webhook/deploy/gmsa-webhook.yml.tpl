@@ -145,6 +145,10 @@ webhooks:
     apiGroups: [""]
     apiVersions: ["*"]
     resources: ["pods"]
+  - operations: ["UPDATE"]
+    apiGroups: [""]
+    apiVersions: ["*"]
+    resources: ["pods/ephemeralcontainers"]
   failurePolicy: Fail
   admissionReviewVersions: ["v1", "v1beta1"]
   sideEffects: None
@@ -174,6 +178,10 @@ webhooks:
     apiGroups: [""]
     apiVersions: ["*"]
     resources: ["pods"]
+  - operations: ["UPDATE"]
+    apiGroups: [""]
+    apiVersions: ["*"]
+    resources: ["pods/ephemeralcontainers"]
   failurePolicy: Fail
   admissionReviewVersions: ["v1", "v1beta1"]
   sideEffects: None
