@@ -1,12 +1,12 @@
 # K8S version can be overriden
 # see available versions at https://hub.docker.com/r/kindest/node/tags
-KUBERNETES_VERSION ?= 1.29.0
+KUBERNETES_VERSION ?= 1.37.0
 # see https://github.com/kubernetes-sigs/kind/releases
-KIND_VERSION = 0.22.0
+KIND_VERSION = 0.33.0
 # https://github.com/helm/helm/releases
-HELM_VERSION ?= 3.14.3
+HELM_VERSION ?= 4.3.0
 # https://github.com/cert-manager/cert-manager/releases
-CERT_MANAGER_VERSION ?= v1.14.4
+CERT_MANAGER_VERSION ?= v1.20.4
 
 CLUSTER_NAME ?= windows-gmsa-dev
 DEPLOYMENT_NAME ?= windows-gmsa-dev
