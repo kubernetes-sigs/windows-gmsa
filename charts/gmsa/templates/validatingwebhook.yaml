@@ -22,6 +22,12 @@ webhooks:
         apiGroups: [""]
         apiVersions: ["*"]
         resources: ["pods"]
+      # ephemeral containers are appended to an existing pod via this dedicated subresource, and
+      # are never present on a "pods" CREATE/UPDATE request, hence the separate rule.
+      - operations: ["UPDATE"]
+        apiGroups: [""]
+        apiVersions: ["*"]
+        resources: ["pods/ephemeralcontainers"]
     failurePolicy: Fail
     admissionReviewVersions: ["v1", "v1beta1"]
     sideEffects: None

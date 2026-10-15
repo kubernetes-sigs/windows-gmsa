@@ -79,13 +79,22 @@ func buildPodWithHostName(serviceAccountName string, hostname *string, podWindow
 // buildPodWithInitContainers is like buildPodWithHostName, but also populates `.Spec.InitContainers`
 // from `initContainerNamesAndWindowsOptions`, using the same conventions as `containerNamesAndWindowsOptions`.
 func buildPodWithInitContainers(serviceAccountName string, hostname *string, podWindowsOptions *corev1.WindowsSecurityContextOptions, containerNamesAndWindowsOptions, initContainerNamesAndWindowsOptions map[string]*corev1.WindowsSecurityContextOptions) *corev1.Pod {
+	return buildPodWithEphemeralContainers(serviceAccountName, hostname, podWindowsOptions, containerNamesAndWindowsOptions, initContainerNamesAndWindowsOptions, nil)
+}
+
+// buildPodWithEphemeralContainers is like buildPodWithInitContainers, but also populates
+// `.Spec.EphemeralContainers` from `ephemeralContainerNamesAndWindowsOptions`, using the same
+// conventions as `containerNamesAndWindowsOptions`.
+func buildPodWithEphemeralContainers(serviceAccountName string, hostname *string, podWindowsOptions *corev1.WindowsSecurityContextOptions, containerNamesAndWindowsOptions, initContainerNamesAndWindowsOptions, ephemeralContainerNamesAndWindowsOptions map[string]*corev1.WindowsSecurityContextOptions) *corev1.Pod {
 	containers := buildContainers(containerNamesAndWindowsOptions)
 	initContainers := buildContainers(initContainerNamesAndWindowsOptions)
+	ephemeralContainers := buildEphemeralContainers(ephemeralContainerNamesAndWindowsOptions)
 
 	podSpec := corev1.PodSpec{
-		ServiceAccountName: serviceAccountName,
-		Containers:         containers,
-		InitContainers:     initContainers,
+		ServiceAccountName:  serviceAccountName,
+		Containers:          containers,
+		InitContainers:      initContainers,
+		EphemeralContainers: ephemeralContainers,
 	}
 
 	if hostname != nil {
@@ -122,6 +131,37 @@ func buildContainers(namesAndWindowsOptions map[string]*corev1.WindowsSecurityCo
 }
 
 func shuffleContainers(a []corev1.Container) {
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	for i := len(a) - 1; i > 0; i-- {
+		j := r.Int() % (i + 1)
+		tmp := a[j]
+		a[j] = a[i]
+		a[i] = tmp
+	}
+}
+
+// buildEphemeralContainers builds a shuffled slice of ephemeral containers named after the keys of
+// `namesAndWindowsOptions`, with their `.SecurityContext.WindowsOptions` field set to the
+// corresponding value.
+func buildEphemeralContainers(namesAndWindowsOptions map[string]*corev1.WindowsSecurityContextOptions) []corev1.EphemeralContainer {
+	ephemeralContainers := make([]corev1.EphemeralContainer, len(namesAndWindowsOptions))
+	i := 0
+	for name, winOptions := range namesAndWindowsOptions {
+		ephemeralContainers[i] = corev1.EphemeralContainer{
+			EphemeralContainerCommon: corev1.EphemeralContainerCommon{Name: name},
+		}
+		if winOptions != nil {
+			ephemeralContainers[i].SecurityContext = &corev1.SecurityContext{WindowsOptions: winOptions}
+		}
+		i++
+	}
+
+	shuffleEphemeralContainers(ephemeralContainers)
+
+	return ephemeralContainers
+}
+
+func shuffleEphemeralContainers(a []corev1.EphemeralContainer) {
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	for i := len(a) - 1; i > 0; i-- {
 		j := r.Int() % (i + 1)
