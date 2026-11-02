@@ -56,3 +56,11 @@ tolerations: []
 qps: 30.0
 burst: 50
 randomHostname: false
+
+# Additional namespace filters shared by the mutating and validating webhooks.
+# All conditions are ANDed with the built-in exclusions: the release namespace
+# and namespaces labeled windows.k8s.io/disabled: "true" are always excluded.
+# Empty filters preserve the default behavior for all other namespaces.
+namespaceSelector:
+  matchLabels: {}
+  matchExpressions: []

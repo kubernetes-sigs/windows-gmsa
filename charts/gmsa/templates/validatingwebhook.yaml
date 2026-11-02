@@ -31,12 +31,5 @@ webhooks:
     failurePolicy: Fail
     admissionReviewVersions: ["v1", "v1beta1"]
     sideEffects: None
-    # don't run on ${NAMESPACE}
     namespaceSelector:
-      matchExpressions:
-        - key: kubernetes.io/metadata.name
-          operator: NotIn
-          values: [{{ .Release.Namespace }}]
-        - key: windows.k8s.io/disabled
-          operator: NotIn
-          values: ["true"]
+      {{- include "gmsa.namespaceSelector" . | trim | nindent 6 }}
