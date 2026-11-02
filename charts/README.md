@@ -54,6 +54,59 @@ The following table lists the configurable parameters of the latest GMSA chart a
 | `setPodOs`                                         | Enables setting of `OS` field on Pod for supported K8s versions       | `true`                                          |
 | `viewerRole`                                       | Enable aggregation of `gmsacredentialspecs` to the built-in view role | `false`                                         |
 
+## Namespace filtering
+
+Both webhooks use `namespaceSelector.matchLabels` (default `{}`) and
+`namespaceSelector.matchExpressions` (default `[]`) as additional filters on
+**namespace labels**, not Pod labels. All conditions are ANDed with the built-in
+exclusions: the Helm release namespace and namespaces labeled
+`windows.k8s.io/disabled: "true"` are always excluded. Empty filters preserve the
+existing behavior for all other namespaces.
+
+To include only named namespaces, set the following in your values file:
+
+```yaml
+namespaceSelector:
+  matchExpressions:
+    - key: kubernetes.io/metadata.name
+      operator: In
+      values: ["app-production", "app-staging"]
+```
+
+To include all namespaces except specific ones (and the built-in exclusions):
+
+```yaml
+namespaceSelector:
+  matchExpressions:
+    - key: kubernetes.io/metadata.name
+      operator: NotIn
+      values: ["sandbox", "monitoring"]
+```
+
+To opt in using a custom namespace label:
+
+```yaml
+namespaceSelector:
+  matchLabels:
+    windows.k8s.io/gmsa-enabled: "true"
+```
+
+Apply the file with:
+
+```console
+helm upgrade --install gmsa ./charts/gmsa --namespace gmsa-system --create-namespace -f values.yaml
+```
+ Label the desired namespaces with
+`kubectl label namespace app-production windows.k8s.io/gmsa-enabled=true`
+when using the label-based example.
+
+You can combine label and expression filters. Multiple values within `In` are
+alternatives; separate expressions must all match. `NotIn` also matches when
+the label is absent. Nonmatching namespaces skip **both GMSA mutation and
+validation**, including credential-spec injection and service-account permission
+checks. Filtering is performed by the Kubernetes API server before calling the
+webhooks; no application configuration is required.
+
 ## troubleshooting
 
 - Add `--wait -v=5 --debug` in `helm install` command to get detailed error

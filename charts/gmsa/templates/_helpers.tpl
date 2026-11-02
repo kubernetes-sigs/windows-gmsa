@@ -45,3 +45,22 @@ apiVersion: cert-manager.io/v1
 INSERT_CERTIFICATE_FROM_SECRET
 {{- end -}}
 {{- end }}
+
+{{/* Apply the same additive namespace filters to both webhooks. */}}
+{{- define "gmsa.namespaceSelector" -}}
+{{- $selector := .Values.namespaceSelector | default dict -}}
+{{- with $selector.matchLabels }}
+matchLabels:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+matchExpressions:
+  - key: kubernetes.io/metadata.name
+    operator: NotIn
+    values: [{{ .Release.Namespace | quote }}]
+  - key: windows.k8s.io/disabled
+    operator: NotIn
+    values: ["true"]
+{{- with $selector.matchExpressions }}
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+{{- end }}
